@@ -65,11 +65,22 @@ class Hub:
     #    return await self._hass.async_add_executor_job(self._init_data)
 
     async def init_data(self):
+        # try: 
+        #     result = self.read_info_data()
+        # except Exception as e:
+        #     _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id} {e}")
+        #     raise Exception(f"Error reading inverter info unit id: {self._unit_id}")
+        
+        result = False
         try: 
-            result = self.read_info_data()
+            retries = 0
+            while result==False and retries<4:
+                result = self.read_info_data()
+                retries += 1
         except Exception as e:
             _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id} {e}")
             raise Exception(f"Error reading inverter info unit id: {self._unit_id}")
+
         if result == False:
             _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id}")
             #raise Exception(f"Error reading inverter info unit id: {self._unit_id}")
@@ -293,15 +304,15 @@ class Hub:
 
         regs = data.registers
 
-        soc = self._client.convert_from_registers(regs[0:1], data_type = self._client.DATATYPE.INT16)
-        max_cell_voltage = round(self._client.convert_from_registers(regs[1:2], data_type = self._client.DATATYPE.INT16) * 0.01,2)
-        min_cell_voltage = round(self._client.convert_from_registers(regs[2:3], data_type = self._client.DATATYPE.INT16) * 0.01,2)
-        soh = self._client.convert_from_registers(regs[3:4], data_type = self._client.DATATYPE.INT16)
+        soc = self._client.convert_from_registers(regs[0:1], data_type = self._client.DATATYPE.UINT16)
+        max_cell_voltage = round(self._client.convert_from_registers(regs[1:2], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
+        min_cell_voltage = round(self._client.convert_from_registers(regs[2:3], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
+        soh = self._client.convert_from_registers(regs[3:4], data_type = self._client.DATATYPE.UINT16)
         current = round(self._client.convert_from_registers(regs[4:5], data_type = self._client.DATATYPE.INT16) * 0.1,1)
-        bat_voltage = round(self._client.convert_from_registers(regs[5:6], data_type = self._client.DATATYPE.INT16) * 0.01,2)
-        max_cell_temp = self._client.convert_from_registers(regs[6:7], data_type = self._client.DATATYPE.INT16)
-        min_cell_temp = self._client.convert_from_registers(regs[7:8], data_type = self._client.DATATYPE.INT16)
-        bmu_temp = self._client.convert_from_registers(regs[8:9], data_type = self._client.DATATYPE.INT16)
+        bat_voltage = round(self._client.convert_from_registers(regs[5:6], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
+        max_cell_temp = self._client.convert_from_registers(regs[6:7], data_type = self._client.DATATYPE.UINT16)
+        min_cell_temp = self._client.convert_from_registers(regs[7:8], data_type = self._client.DATATYPE.UINT16)
+        bmu_temp = self._client.convert_from_registers(regs[8:9], data_type = self._client.DATATYPE.UINT16)
 
         self.data['soc'] = soc
         self.data['max_cell_v'] = max_cell_voltage
@@ -312,5 +323,6 @@ class Hub:
         self.data['max_cell_temp'] = max_cell_temp
         self.data['min_cell_temp'] = min_cell_temp
         self.data['bmu_temp'] = bmu_temp
+        self.data['power'] = current * bat_voltage
 
         return True
