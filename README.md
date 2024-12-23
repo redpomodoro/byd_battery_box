@@ -17,8 +17,7 @@ After reboot of Home-Assistant, this integration can be configured through the i
 
 # Usage
 
-### Battery Storage
-
+### Battery Management Unit
 
 ### Sensors
 | Entity  | Description |
@@ -34,3 +33,6 @@ To come!
 
 
 # References
+https://github.com/sarnau/BYD-Battery-Box-Infos/blob/main/Read_Modbus.py
+https://github.com/christianh17/ioBroker.bydhvs/blob/master/docs/byd-hexstructure.md
+https://github.com/smarthomeNG/plugins/tree/develop/byd_bat
