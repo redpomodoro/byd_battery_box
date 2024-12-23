@@ -53,8 +53,12 @@ SENSOR_TYPES = {
     "bmu_temp": ["BMU Temp", "bmu_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
     "bmu_temp": ["BMU Temp", "bmu_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
     "current": ["Current", "current", SensorDeviceClass.CURRENT, SensorStateClass.MEASUREMENT, "A", "mdi:lightning-bolt", None],
-    "voltage": ["Voltage", "voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "bat_voltage": ["Battery Voltage", "bat_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "output_voltage": ["Output Voltage", "output_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
     "power": ["Power", "power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:lightning-bolt", None],
+    "charge_cycles": ["Charge Cycles", "charge_cycles", None, None, None, None, None],
+    "discharge_cycles": ["Discharge Cycles", "discharge_cycles", None, None, None, None, None],
+    "error": ["Error bitmask", "error", None, None, None, None, None],
 }
 
 METER_SENSOR_TYPES = {

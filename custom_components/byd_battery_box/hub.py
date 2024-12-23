@@ -310,19 +310,27 @@ class Hub:
         soh = self._client.convert_from_registers(regs[3:4], data_type = self._client.DATATYPE.UINT16)
         current = round(self._client.convert_from_registers(regs[4:5], data_type = self._client.DATATYPE.INT16) * 0.1,1)
         bat_voltage = round(self._client.convert_from_registers(regs[5:6], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
-        max_cell_temp = self._client.convert_from_registers(regs[6:7], data_type = self._client.DATATYPE.UINT16)
-        min_cell_temp = self._client.convert_from_registers(regs[7:8], data_type = self._client.DATATYPE.UINT16)
-        bmu_temp = self._client.convert_from_registers(regs[8:9], data_type = self._client.DATATYPE.UINT16)
+        max_cell_temp = self._client.convert_from_registers(regs[6:7], data_type = self._client.DATATYPE.INT16)
+        min_cell_temp = self._client.convert_from_registers(regs[7:8], data_type = self._client.DATATYPE.INT16)
+        bmu_temp = self._client.convert_from_registers(regs[8:9], data_type = self._client.DATATYPE.INT16)
+        error = self._client.convert_from_registers(regs[13:14], data_type = self._client.DATATYPE.UINT16)
+        output_voltage = self._client.convert_from_registers(regs[16:17], data_type = self._client.DATATYPE.UINT16)
+        charge_cycles = self._client.convert_from_registers(regs[17:18], data_type = self._client.DATATYPE.UINT16)
+        discharge_cycles = self._client.convert_from_registers(regs[19:20], data_type = self._client.DATATYPE.UINT16)
 
         self.data['soc'] = soc
         self.data['max_cell_v'] = max_cell_voltage
         self.data['min_cell_v'] = min_cell_voltage
         self.data['soh'] = soh
         self.data['current'] = current
-        self.data['voltage'] = bat_voltage
+        self.data['bat_voltage'] = bat_voltage
         self.data['max_cell_temp'] = max_cell_temp
         self.data['min_cell_temp'] = min_cell_temp
         self.data['bmu_temp'] = bmu_temp
-        self.data['power'] = current * bat_voltage
+        self.data['error'] = error
+        self.data['output_voltage'] = output_voltage
+        self.data['power'] = current * output_voltage
+        self.data['charge_cycles'] = charge_cycles
+        self.data['discharge_cycles'] = discharge_cycles
 
         return True
