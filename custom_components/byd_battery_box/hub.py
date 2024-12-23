@@ -33,7 +33,8 @@ from .const import (
     DOMAIN,
     INVERTER_LIST,
     APPLICATION_LIST,
-    PHASE_LIST
+    PHASE_LIST,
+    ATTR_MANUFACTURER
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -93,16 +94,26 @@ class Hub:
         return True
 
     @property 
-    def device_info(self) -> dict:
+    def device_info_bmu(self) -> dict:
         return {
-            "identifiers": {(DOMAIN, f'{self._name}_byd_bms')},
-            "name": f'BYD Battery Box',
-            "manufacturer": self.data.get('manufacturer'),
+            "identifiers": {(DOMAIN, f'{self._name}_byd_bmu')},
+            "name": f'Battery Management Unit',
+            "manufacturer": ATTR_MANUFACTURER,
+            "model": self.data.get('model'),
+            "serial_number": self.data.get('serial'),
+            "sw_version": self.data.get('bmu2_v'),
+        }
+
+    def get_device_info_bms(self,id) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f'{self._name}_byd_bms_{id}')},
+            "name": f'Battery Management System {id}',
+            "manufacturer": ATTR_MANUFACTURER,
             "model": self.data.get('model'),
             "serial_number": self.data.get('serial'),
             "sw_version": self.data.get('bms_v'),
         }
-
+    
     @property
     def hub_id(self) -> str:
         """ID for hub."""
@@ -244,7 +255,7 @@ class Hub:
 
         regs = data.registers
 
-        bmuSerial = self._client.convert_from_registers(regs[0:9], data_type = self._client.DATATYPE.STRING)
+        bmuSerial = self._client.convert_from_registers(regs[0:10], data_type = self._client.DATATYPE.STRING)[:-1]
         self.data['serial'] = bmuSerial
 
         if bmuSerial.startswith('P03') or bmuSerial.startswith('E0P3'):
@@ -314,7 +325,7 @@ class Hub:
         min_cell_temp = self._client.convert_from_registers(regs[7:8], data_type = self._client.DATATYPE.INT16)
         bmu_temp = self._client.convert_from_registers(regs[8:9], data_type = self._client.DATATYPE.INT16)
         error = self._client.convert_from_registers(regs[13:14], data_type = self._client.DATATYPE.UINT16)
-        output_voltage = self._client.convert_from_registers(regs[16:17], data_type = self._client.DATATYPE.UINT16)
+        output_voltage = round(self._client.convert_from_registers(regs[16:17], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
         charge_cycles = self._client.convert_from_registers(regs[17:18], data_type = self._client.DATATYPE.UINT16)
         discharge_cycles = self._client.convert_from_registers(regs[19:20], data_type = self._client.DATATYPE.UINT16)
 

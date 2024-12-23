@@ -26,45 +26,40 @@ DEFAULT_UNIT_ID = 1
 CONF_UNIT_ID = "unit_id"
 ATTR_MANUFACTURER = "BYD"
 
-SENSOR_TYPES = {
-    # "acpower": ["AC Power", "acpower", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:lightning-bolt", None],
-    # "acenergy": ["AC Energy", "acenergy", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", "mdi:lightning-bolt", None],
-    # "tempcab": ["Temperature", "tempcab", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
-    # "mppt1_power": ["MPPT1 Power", "mppt1_power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:solar-power", None],
-    # "mppt2_power": ["MPPT2 Power", "mppt2_power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:solar-power", None],
-    # "mppt3_power": ["Storage Charging Power", "mppt3_power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:home-battery", None],
-    # "mppt4_power": ["Storage Discharging Power", "mppt4_power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:home-battery", None],
-    # "pv_power": ["PV Power", "pv_power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:solar-power", None],
-    # "storage_power": ["Storage Power", "storage_power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:home-battery", None],
-    # "mppt1_lfte": ["MPPT1 Lifetime Energy", "mppt1_lfte", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", "mdi:solar-panel", None],
-    # "mppt2_lfte": ["MPPT2 Lifetime Energy", "mppt2_lfte", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", "mdi:solar-panel", None],
-    # "mppt3_lfte": ["Storage Charging Lifetime Energy", "mppt3_lfte", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", "mdi:home-battery", None],
-    # "mppt4_lfte": ["Storage Discharging Lifetime Energy", "mppt4_lfte", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", "mdi:home-battery", None],
-    # "load": ["Load", "load", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:lightning-bolt", None],
-#    "unit_id": ["Modbus ID", "i_unit_id", None, None, None, None, EntityCategory.DIAGNOSTIC],
+BMU_SENSOR_TYPES = {
     "inverter": ["Inverter", "inverter", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "bmu1_v": ["BMU 1 Version", "bmu1_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "bmu2_v": ["BMU 2 Version", "bmu2_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "bms_v": ["BMS Version", "bms_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "towers": ["Towers", "towers", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "modules": ["Modules", "modules", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "application": ["Application", "application", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "phase": ["Phase", "phase", None, None, None, None, EntityCategory.DIAGNOSTIC],
 
     "soc": ["State of Charge", "soc", None, SensorStateClass.MEASUREMENT, "%", "mdi:battery", None],
-    "bmu_temp": ["BMU Temp", "bmu_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
-    "bmu_temp": ["BMU Temp", "bmu_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
-    "current": ["Current", "current", SensorDeviceClass.CURRENT, SensorStateClass.MEASUREMENT, "A", "mdi:lightning-bolt", None],
-    "bat_voltage": ["Battery Voltage", "bat_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
-    "output_voltage": ["Output Voltage", "output_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
-    "power": ["Power", "power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:lightning-bolt", None],
+    "bmu_temp": ["BMU Temperature", "bmu_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
+    "max_cell_temp": ["BMU Maximum Cell Temperature", "max_cell_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
+    "min_cell_temp": ["BMU Minimum Cell Temperature", "min_cell_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
+    "max_cell_v": ["BMU Maximum Cell Voltage", "max_cell_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "min_cell_v": ["BMU Minimum Cell Voltage", "min_cell_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "current": ["BMU Current", "current", SensorDeviceClass.CURRENT, SensorStateClass.MEASUREMENT, "A", "mdi:lightning-bolt", None],
+    "bat_voltage": ["BMU Battery Voltage", "bat_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "output_voltage": ["BMU Output Voltage", "output_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "power": ["BMU Power", "power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:lightning-bolt", None],
     "charge_cycles": ["Charge Cycles", "charge_cycles", None, None, None, None, None],
     "discharge_cycles": ["Discharge Cycles", "discharge_cycles", None, None, None, None, None],
     "error": ["Error bitmask", "error", None, None, None, None, None],
 }
 
-METER_SENSOR_TYPES = {
-    "power": ["Power", "power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:lightning-bolt", None],
-    "exported": ["Exported", "exported", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", "mdi:lightning-bolt", None],
-    "imported": ["Imported", "imported", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", "mdi:lightning-bolt", None],
-    "unit_id": ["Modbus ID", "unit_id", None, None, None, None, EntityCategory.DIAGNOSTIC],
+BMS_SENSOR_TYPES = {
+    "max_cell_voltage": ["Maximum Cell Voltage", "max_cell_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "min_cell_voltage": ["Maximum Cell Voltage", "min_cell_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "max_cell_v": ["Maximum Cell Voltage", "max_cell_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "min_cell_v": ["Minimum Cell Voltage", "min_cell_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "current": ["Current", "current", SensorDeviceClass.CURRENT, SensorStateClass.MEASUREMENT, "A", "mdi:lightning-bolt", None],
+    "bat_voltage": ["Battery Voltage", "bat_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "output_voltage": ["Output Voltage", "output_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
 }
+
+
 

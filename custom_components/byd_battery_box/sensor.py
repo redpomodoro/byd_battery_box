@@ -20,7 +20,8 @@ from homeassistant.core import callback
 
 from . import HubConfigEntry
 from .const import (
-    SENSOR_TYPES,
+    BMU_SENSOR_TYPES,
+    BMS_SENSOR_TYPES,
     ENTITY_PREFIX,
 )
 from .hub import Hub
@@ -38,13 +39,29 @@ async def async_setup_entry(
 
     entities = []
 
-    for sensor_info in SENSOR_TYPES.values():
+    for sensor_info in BMU_SENSOR_TYPES.values():
         sensor = BydBoxSensor(
             platform_name = ENTITY_PREFIX,
             hub = hub,
-            device_info = hub.device_info,
+            device_info = hub.device_info_bmu,
             name = sensor_info[0],
             key = sensor_info[1],
+            device_class = sensor_info[2],
+            state_class = sensor_info[3],
+            unit = sensor_info[4],
+            icon = sensor_info[5],
+            entity_category = sensor_info[6],
+        )
+        entities.append(sensor)
+
+    id = 1
+    for sensor_info in BMS_SENSOR_TYPES.values():
+        sensor = BydBoxSensor(
+            platform_name = ENTITY_PREFIX,
+            hub = hub,
+            device_info = hub.get_device_info_bms(id),
+            name = f'BMS {id} ' + sensor_info[0],
+            key = f'bms{id}_' + sensor_info[1],
             device_class = sensor_info[2],
             state_class = sensor_info[3],
             unit = sensor_info[4],
