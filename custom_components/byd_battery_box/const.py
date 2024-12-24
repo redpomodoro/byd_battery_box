@@ -8,6 +8,7 @@ DOMAIN = "byd_battery_box"
 INVERTER_LIST = [ "Fronius HV", "Goodwe HV/Viessmann HV", "Goodwe LV/Viessmann LV", "KOSTAL HV", "Selectronic LV", "SMA SBS3.7/5.0/6.0 HV", "SMA LV", "Victron LV", "SUNTECH LV", "Sungrow HV", "KACO_HV", "Studer LV", "SolarEdge LV", "Ingeteam HV", "Sungrow LV", "Schneider LV", "SMA SBS2.5 HV", "Solis LV", "Solis HV", "SMA STP 5.0-10.0 SE HV", "Deye LV", "Phocos LV", "GE HV", "Deye HV", "Raion LV", "KACO_NH", "Solplanet", "Western HV", "SOSEN", "Hoymiles LV", "Hoymiles HV", "SAJ HV" ]
 APPLICATION_LIST = [ "Off Grid", "On Grid", "Backup" ]
 PHASE_LIST = [ "Single", "Three" ]
+WORKING_AREA = [ "B", "A", "B"]
 
 MAX_MODULES = 8
 BMU_INDEX = 0x0000
@@ -28,27 +29,30 @@ ATTR_MANUFACTURER = "BYD"
 
 BMU_SENSOR_TYPES = {
     "inverter": ["Inverter", "inverter", None, None, None, None, EntityCategory.DIAGNOSTIC],
-    "bmu1_v": ["BMU 1 Version", "bmu1_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
-    "bmu2_v": ["BMU 2 Version", "bmu2_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "bmu_v": ["BMU Version", "bmu_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "bmu_v_A": ["BMU Version A", "bmu_v_A", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "bmu_v_B": ["BMU Version B", "bmu_v_B", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "bms_v": ["BMS Version", "bms_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "towers": ["Towers", "towers", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "modules": ["Modules", "modules", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "application": ["Application", "application", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "phase": ["Phase", "phase", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "error": ["Error bitmask", "error", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "capacity": ["Total Capacity", "capacity", None, None, "kWh", None, EntityCategory.DIAGNOSTIC],
 
     "soc": ["State of Charge", "soc", None, SensorStateClass.MEASUREMENT, "%", "mdi:battery", None],
     "bmu_temp": ["BMU Temperature", "bmu_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
-    "max_cell_temp": ["BMU Maximum Cell Temperature", "max_cell_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
-    "min_cell_temp": ["BMU Minimum Cell Temperature", "min_cell_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
-    "max_cell_v": ["BMU Maximum Cell Voltage", "max_cell_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
-    "min_cell_v": ["BMU Minimum Cell Voltage", "min_cell_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "max_cell_temp": ["BMU Cell Temperature Max", "max_cell_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
+    "min_cell_temp": ["BMU Cell Temperature Min", "min_cell_temp", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:thermometer", None],
+    "max_cell_v": ["BMU Cell Voltage Max", "max_cell_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "min_cell_v": ["BMU Cell Voltage Min", "min_cell_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
     "current": ["BMU Current", "current", SensorDeviceClass.CURRENT, SensorStateClass.MEASUREMENT, "A", "mdi:lightning-bolt", None],
     "bat_voltage": ["BMU Battery Voltage", "bat_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
     "output_voltage": ["BMU Output Voltage", "output_voltage", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
     "power": ["BMU Power", "power", SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, "W", "mdi:lightning-bolt", None],
-    "charge_cycles": ["Charge Cycles", "charge_cycles", None, None, None, None, None],
-    "discharge_cycles": ["Discharge Cycles", "discharge_cycles", None, None, None, None, None],
-    "error": ["Error bitmask", "error", None, None, None, None, None],
+    "charge_lfte": ["Charge Total Energy", "charge_lfte", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", None, None],
+    "discharge_lfte": ["Discharge Total Energy", "discharge_lfte", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "Wh", None, None],
+    "efficiency": ["Efficiency", "efficiency",None, None, "%", None, None],
 }
 
 BMS_SENSOR_TYPES = {

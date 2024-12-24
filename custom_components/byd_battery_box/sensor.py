@@ -54,21 +54,21 @@ async def async_setup_entry(
         )
         entities.append(sensor)
 
-    id = 1
-    for sensor_info in BMS_SENSOR_TYPES.values():
-        sensor = BydBoxSensor(
-            platform_name = ENTITY_PREFIX,
-            hub = hub,
-            device_info = hub.get_device_info_bms(id),
-            name = f'BMS {id} ' + sensor_info[0],
-            key = f'bms{id}_' + sensor_info[1],
-            device_class = sensor_info[2],
-            state_class = sensor_info[3],
-            unit = sensor_info[4],
-            icon = sensor_info[5],
-            entity_category = sensor_info[6],
-        )
-        entities.append(sensor)
+    # id = 1
+    # for sensor_info in BMS_SENSOR_TYPES.values():
+    #     sensor = BydBoxSensor(
+    #         platform_name = ENTITY_PREFIX,
+    #         hub = hub,
+    #         device_info = hub.get_device_info_bms(id),
+    #         name = f'BMS {id} ' + sensor_info[0],
+    #         key = f'bms{id}_' + sensor_info[1],
+    #         device_class = sensor_info[2],
+    #         state_class = sensor_info[3],
+    #         unit = sensor_info[4],
+    #         icon = sensor_info[5],
+    #         entity_category = sensor_info[6],
+    #     )
+    #     entities.append(sensor)
 
     async_add_entities(entities)
     return True

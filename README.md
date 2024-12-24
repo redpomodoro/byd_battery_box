@@ -30,7 +30,7 @@ After reboot of Home-Assistant, this integration can be configured through the i
 To come!
 
 # Example Devices
-
+![bmu](images/bmu.png?raw=true "bmu")
 
 
 # References

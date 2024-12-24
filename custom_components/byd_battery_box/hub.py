@@ -8,33 +8,20 @@ import operator
 import threading
 from datetime import timedelta
 from typing import Optional
-#import sys
-#sys.set_int_max_str_digits(0)
 
-#import homeassistant.helpers.config_validation as cv
-#from homeassistant.config_entries import ConfigEntry
-#from homeassistant.const import CONF_NAME, CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
-#from homeassistant.core import HomeAssistant
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.core import HomeAssistant
 
 from pymodbus.client import ModbusTcpClient
-#from pymodbus.constants import Endian
-#from pymodbus.payload import BinaryPayloadDecoder
-#from pymodbus.framer import FramerType
-#from pymodbus.transaction import ModbusRtuFramer
-#from pymodbus.transaction import ModbusRtuFramer
-#from pymodbus.framer import Framer
-#from importlib.metadata import version
-
 
 from .const import (
     DOMAIN,
     INVERTER_LIST,
     APPLICATION_LIST,
     PHASE_LIST,
-    ATTR_MANUFACTURER
+    ATTR_MANUFACTURER,
+    WORKING_AREA
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,7 +66,7 @@ class Hub:
                 result = self.read_info_data()
                 retries += 1
         except Exception as e:
-            _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id} {e}")
+            _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id}", exc_info=True)
             raise Exception(f"Error reading inverter info unit id: {self._unit_id}")
 
         if result == False:
@@ -87,9 +74,14 @@ class Hub:
             #raise Exception(f"Error reading inverter info unit id: {self._unit_id}")
 
         try:
+            result = self.read_ext_info_data()
+        except Exception as e:
+            _LOGGER.error(f"Error reading ext info data", exc_info=True)
+
+        try:
             result = self.read_status_data()
         except Exception as e:
-            _LOGGER.error(f"Error reading status data")
+            _LOGGER.error(f"Error reading status data", exc_info=True)
 
         return True
 
@@ -101,7 +93,7 @@ class Hub:
             "manufacturer": ATTR_MANUFACTURER,
             "model": self.data.get('model'),
             "serial_number": self.data.get('serial'),
-            "sw_version": self.data.get('bmu2_v'),
+            "sw_version": self.data.get('bmu_v'),
         }
 
     def get_device_info_bms(self,id) -> dict:
@@ -178,6 +170,12 @@ class Hub:
             update_result = False
 
         try:
+            update_result = self.read_ext_info_data()
+        except Exception as e:
+            _LOGGER.error(f"Error reading ext info data", exc_info=True)
+            update_result = False
+
+        try:
             update_result = self.read_status_data()
         except Exception as e:
             _LOGGER.exception("Error reading status data", exc_info=True)
@@ -244,10 +242,56 @@ class Hub:
         filter = ''.join([chr(i) for i in range(0, 32)])
         return value.translate(str.maketrans('', '', filter)).strip()
 
+    def get_inverter_model(self,model,id):
+        # Mapping from Be_Connect (Setup Home) 
+        if model == "LVS":                                     # LVS
+          if id == 0:
+            return INVERTER_LIST[0]                              # Fronius HV
+          elif (id == 1) or (id == 2):
+            return INVERTER_LIST[1]                              # Goodwe HV/Viessmann HV
+          elif id == 3:
+            return INVERTER_LIST[2]                              # KOSTAL HV
+          elif id == 4:
+            return INVERTER_LIST[18]                             # Selectronic LV
+          elif id == 5:
+            return INVERTER_LIST[3]                              # SMA SBS3.7/5.0/6.0 HV
+          elif id == 6:
+            return INVERTER_LIST[19]                             # SMA LV
+          elif id == 7:
+            return INVERTER_LIST[20]                             # Victron LV
+          elif id == 8:
+            return INVERTER_LIST[30]                             # Suntech LV
+          elif id == 9:
+            return INVERTER_LIST[4]                              # Sungrow HV
+          elif id == 10:
+            return INVERTER_LIST[5]                              # KACO_HV
+          elif id == 11:
+            return INVERTER_LIST[21]                             # Studer LV
+          elif id == 12:
+            return INVERTER_LIST[28]                             # SolarEdge LV
+          elif id == 13:
+            return INVERTER_LIST[6]                              # Ingeteam HV
+        elif model == "HVL":                                  # HVL
+          if id == 0:
+            return INVERTER_LIST[1]
+          elif id == 1:
+            return INVERTER_LIST[3]
+          elif id == 2:
+            return INVERTER_LIST[8]
+          elif id == 3:
+            return INVERTER_LIST[10]
+          elif id == 4:
+            return INVERTER_LIST[17]
+        else:                                                    # HVM, HVS
+          if (id >= 0) and (id <= 16):
+            return INVERTER_LIST[id]
+        _LOGGER.error(f"unknown inverter. model: {model} inverter id: {id}")
+        return "NA"
+
     def read_info_data(self):
         """start reading info data"""
         data = self.read_holding_registers(
-            unit_id=self._unit_id, address=0x0000, count=66
+            unit_id=self._unit_id, address=0x0000, count=20
         )
         if data.isError():
             _LOGGER.error(f"info data modbus error. {self._host}:{self._port} unit_id {self._unit_id} data:{data}")
@@ -257,57 +301,119 @@ class Hub:
 
         bmuSerial = self._client.convert_from_registers(regs[0:10], data_type = self._client.DATATYPE.STRING)[:-1]
         self.data['serial'] = bmuSerial
+        #self.data['serial'] = "xxxxxxxxxxxxxxxxxxx"  # for screenshots
 
         if bmuSerial.startswith('P03') or bmuSerial.startswith('E0P3'):
-            BAT_Type = 'P3' # Modules in Serial
-            batteryType = ['HVL','HVM','HVS']
+            # Modules in Serial
+            bat_type = 'HV'
         if bmuSerial.startswith('P02') or bmuSerial.startswith('P011'):
-            BAT_Type = 'P2' # Modules in Paralel
-            batteryType = ['LVL','LVFlex(Lite)','LVS/LVS Lite']
+            # Modules in Paralel
+            bat_type = 'LV'
 
-        bmu1_v1 = regs[0x000C] >> 8
-        bmu1_v2 = regs[0x000C] & 0xFF
-        bmu1_v = f'v{bmu1_v1}.{bmu1_v2}'
-        bmu2_v1 = regs[0x000D] >> 8
-        bmu2_v2 = regs[0x000D] & 0xFF
-        bmu2_v = f'v{bmu2_v1}.{bmu2_v2}'
+        bmu_v_A_1 = regs[0x000C] >> 8
+        bmu_v_A_2 = regs[0x000C] & 0xFF
+        bmu_v_A = f'v{bmu_v_A_1}.{bmu_v_A_2}'
+        bmu_v_B_1 = regs[0x000D] >> 8
+        bmu_v_B_2 = regs[0x000D] & 0xFF
+        bmu_v_B = f'v{bmu_v_B_1}.{bmu_v_B_2}'
         bms_v1 = regs[0x000E] >> 8
         bms_v2 = regs[0x000E] & 0xFF
         bms_v = f'v{bms_v1}.{bms_v2}'   
 
-        bmu_area = regs[0x000f] >> 8
-        bms_area = regs[0x000f] & 0xFF
+        bmu_area = regs[0x000F] >> 8
+        bms_area = regs[0x000F] & 0xFF
 
-        inverter_id = (regs[0x0010] >> 8) & 0x0F
+        if bmu_area == 0:
+            bmu_v = bmu_v_A
+        else:
+            bmu_v = bmu_v_B
+
+        #inverter_id = (regs[0x0010] >> 8) & 0x0F
         towers = (regs[0x0010] >> 4) & 0x0F
         modules = regs[0x0010] & 0x0F
 
         application_id = (regs[0x0011] >> 8) & 0xFF
-        battery_type_id = regs[0x0011] & 0xFF
+        lvs_type_id = regs[0x0011] & 0xFF
         phase_id = (regs[0x0012] >> 8) & 0xFF
-
-        self.data['bmu1_v'] = bmu1_v
-        self.data['bmu2_v'] = bmu2_v
+         
+        self.data['bat_type'] = bat_type
+        self.data['bmu_v_A'] = bmu_v_A
+        self.data['bmu_v_B'] = bmu_v_B
+        self.data['bmu_v'] = bmu_v
         self.data['bms_v'] = bms_v
-        self.data['bmu_area'] = bmu_area
-        self.data['bms_area'] = bms_area
+        self.data['bmu_area'] = WORKING_AREA[bmu_area]
+        self.data['bms_area'] = WORKING_AREA[bms_area]
         self.data['towers'] = towers       
         self.data['modules'] = modules       
-        self.data['inverter'] = INVERTER_LIST[inverter_id]
 
         self.data['application'] = APPLICATION_LIST[application_id]
-        self.data['battery_type'] = batteryType[battery_type_id]       
+        self.data['lvs_type'] = lvs_type_id
         self.data['phase'] = PHASE_LIST[phase_id]
-
-        self.data['model'] = batteryType[battery_type_id]
 
         return True
 
+    def read_ext_info_data(self):
+        """start reading info data"""
+        data = self.read_holding_registers(
+            unit_id=self._unit_id, address=0x0010, count=2
+        )
+        if data.isError():
+            _LOGGER.error(f"ext info data modbus error. {self._host}:{self._port} unit_id {self._unit_id} data:{data}")
+            return False
 
+        regs = data.registers
+
+        inverter_id = regs[0x0000] >> 8
+        hv_type_id = regs[0x0001] >> 8
+
+        modules = self.data['modules']
+        bms_qty = self.data['towers']
+
+        model = "NA"
+        capacity_module = 0.0
+        volt_n = 0
+        temp_n = 0
+        cells_n = 0
+        temps_n = 0
+
+        if hv_type_id == 0:
+          # HVL -> Lithium Iron Phosphate (LFP), 3-8 Module (12kWh-32kWh), unknown specification, so 0 cells and 0 temps
+          model = "HVL"
+          capacity_module = 4.0
+        elif hv_type_id == 1:
+          # HVM 16 Cells per module
+          model = "HVM"
+          capacity_module = 2.76
+          volt_n = 16
+          temp_n = 8
+          cells_n = modules * volt_n
+          temps_n = modules * temp_n
+        elif hv_type_id == 2:
+          # HVS 32 cells per module
+          model = "HVS"
+          capacity_module = 2.56
+          volt_n = 32
+          temp_n = 12
+          cells_n = modules * volt_n
+          temps_n = modules * temp_n
+        else:
+          if self.data['bat_type'] == 'LV':
+            model = "LVS"
+            capacity_module = 4.0
+            volt_n = 7
+            cells_n = modules * volt_n
+ 
+        capacity = bms_qty * modules * capacity_module
+
+        self.data['inverter'] = self.get_inverter_model(model, inverter_id)
+        self.data['model'] = model
+        self.data['capacity'] = capacity
+
+       
     def read_status_data(self):
         """start reading status data"""
         data = self.read_holding_registers(
-            unit_id=self._unit_id, address=0x0500, count=25
+            unit_id=self._unit_id, address=0x0500, count=21
         )
         if data.isError():
             _LOGGER.error(f"status data modbus error. data:{data}")
@@ -326,8 +432,9 @@ class Hub:
         bmu_temp = self._client.convert_from_registers(regs[8:9], data_type = self._client.DATATYPE.INT16)
         error = self._client.convert_from_registers(regs[13:14], data_type = self._client.DATATYPE.UINT16)
         output_voltage = round(self._client.convert_from_registers(regs[16:17], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
-        charge_cycles = self._client.convert_from_registers(regs[17:18], data_type = self._client.DATATYPE.UINT16)
-        discharge_cycles = self._client.convert_from_registers(regs[19:20], data_type = self._client.DATATYPE.UINT16)
+        charge_lfte = self._client.convert_from_registers(regs[17:19], data_type = self._client.DATATYPE.UINT32) * 0.001
+        discharge_lfte = self._client.convert_from_registers(regs[19:21], data_type = self._client.DATATYPE.UINT32) * 0.001
+        efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
 
         self.data['soc'] = soc
         self.data['max_cell_v'] = max_cell_voltage
@@ -341,7 +448,8 @@ class Hub:
         self.data['error'] = error
         self.data['output_voltage'] = output_voltage
         self.data['power'] = current * output_voltage
-        self.data['charge_cycles'] = charge_cycles
-        self.data['discharge_cycles'] = discharge_cycles
+        self.data['charge_lfte'] = charge_lfte
+        self.data['discharge_lfte'] = discharge_lfte
+        self.data['efficiency'] = efficiency
 
         return True
