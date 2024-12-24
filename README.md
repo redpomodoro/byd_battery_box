@@ -9,6 +9,13 @@ Home assistant Custom Component for reading data from BYD Battery Box. This inte
 > This is an unofficial implementation and not supported by BYD. It might stop working at any point in time.
 > You are using this module (and it's prerequisites/dependencies) at your own risk. Not me neither any of contributors to this or any prerequired/dependency project are responsible for damage in any kind caused by this project or any of its prerequsites/dependencies.
 
+> [!CAUTION]
+> This Home Assistant integration does not resolve the BYD HVS/HVM network issues. The battery must be connected by LAN cable and a special network configuration (static routes on the router) is required for this integration to work properly.
+> The network must be configured in advance to use this integration.
+> The default IP address of the BYD battery is 192.168.16.254.
+>
+> If you try opening http://192.168.16.254 in a browser, it must work. Otherwise, this integration will not work either.
+
 # Installation
 Copy contents of custom_components folder to your home-assistant config/custom_components folder or install through HACS.
 After reboot of Home-Assistant, this integration can be configured through the integration setup UI.
