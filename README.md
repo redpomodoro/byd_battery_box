@@ -45,6 +45,9 @@ To come!
 ![bms](images/bmu.png?raw=true "bms")
 
 
+![cell voltages](images/cell_voltages.png?raw=true "cell voltages")
+
+
 
 Apex char
 type: custom:apexcharts-card
