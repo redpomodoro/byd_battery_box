@@ -16,7 +16,9 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_PORT,
     DEFAULT_UNIT_ID,
-    CONF_UNIT_ID
+    CONF_UNIT_ID,
+    DEFAULT_BMS_SCAN_INTERVAL,
+    CONF_BMS_SCAN_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
         vol.Required(CONF_UNIT_ID, default=DEFAULT_UNIT_ID): int,
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
+        vol.Optional(CONF_BMS_SCAN_INTERVAL, default=DEFAULT_BMS_SCAN_INTERVAL): int,
     }
 )
 
@@ -55,16 +58,19 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
         raise InvalidHost
     if data[CONF_PORT] > 65535:
         raise InvalidPort
-    
+    if data[CONF_SCAN_INTERVAL] < 10:
+        raise ScanIntervalTooShort
+    if data[CONF_BMS_SCAN_INTERVAL] < 60:
+        raise BmsScanIntervalTooShort
+
     try:
-        hub = Hub(hass, data[CONF_NAME], data[CONF_HOST], data[CONF_PORT], data[CONF_UNIT_ID], data[CONF_SCAN_INTERVAL])
+        hub = Hub(hass, data[CONF_NAME], data[CONF_HOST], data[CONF_PORT], data[CONF_UNIT_ID], data[CONF_SCAN_INTERVAL], data[CONF_BMS_SCAN_INTERVAL])
         await hub.init_data()
     except Exception as e:
         # If there is an error, raise an exception to notify HA that there was a
         # problem. The UI will also show there was a problem
         _LOGGER.error(f"Cannot start hub {e}")
         raise CannotConnect
-
 
     #result = await hub.test_connection()
     #if not result:
@@ -102,14 +108,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=info["title"], data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
-            except InvalidHost:
+            except ScanIntervalTooShort:
+                errors["base"] = "scan_interval_too_short"
+            except BmsScanIntervalTooShort:
+                errors["base"] = "bms_scan_interval_too_short"
+            except InvalidPort:
+                errors["base"] = "bms_scan_interval_too_short"
+            except BmsScanIntervalTooShort:
+                errors["port"] = "invalid_port"
                 # The error string is set here, and should be translated.
                 # This example does not currently cover translations, see the
                 # comments on `DATA_SCHEMA` for further details.
                 # Set the error on the `host` field, not the entire form.
                 errors["host"] = "invalid_host"
-            except UnsupportedHardware:
-                errors["base"] = "unsupported_hardware"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -128,6 +139,8 @@ class InvalidHost(exceptions.HomeAssistantError):
 class InvalidPort(exceptions.HomeAssistantError):
     """Error to indicate there is an invalid hostname."""
 
-class UnsupportedHardware(exceptions.HomeAssistantError):
-    """Error to indicate there is an unsupported hardware."""
+class ScanIntervalTooShort(exceptions.HomeAssistantError):
+    """Error to indicate the scan interval is too short."""
 
+class BmsScanIntervalTooShort(exceptions.HomeAssistantError):
+    """Error to indicate the bms scan interval is too short."""

@@ -7,16 +7,12 @@ from typing import Optional, Dict, Any
 from homeassistant.components.sensor import (
     SensorEntity,
 )
-#from homeassistant.const import UnitOfTemperature
 from homeassistant.const import CONF_NAME #, CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
-#from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.icon import icon_for_battery_level
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-#from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.entity import Entity
 from homeassistant.core import callback
-#from homeassistant.util import dt as dt_util
 
 from . import HubConfigEntry
 from .const import (
@@ -54,21 +50,23 @@ async def async_setup_entry(
         )
         entities.append(sensor)
 
-    # id = 1
-    # for sensor_info in BMS_SENSOR_TYPES.values():
-    #     sensor = BydBoxSensor(
-    #         platform_name = ENTITY_PREFIX,
-    #         hub = hub,
-    #         device_info = hub.get_device_info_bms(id),
-    #         name = f'BMS {id} ' + sensor_info[0],
-    #         key = f'bms{id}_' + sensor_info[1],
-    #         device_class = sensor_info[2],
-    #         state_class = sensor_info[3],
-    #         unit = sensor_info[4],
-    #         icon = sensor_info[5],
-    #         entity_category = sensor_info[6],
-    #     )
-    #     entities.append(sensor)
+    towers = hub.data.get('towers')
+    if not towers is None and towers > 0:
+        for id in range(1,towers +1):
+            for sensor_info in BMS_SENSOR_TYPES.values():
+                sensor = BydBoxSensor(
+                    platform_name = ENTITY_PREFIX,
+                    hub = hub,
+                    device_info = hub.get_device_info_bms(id),
+                    name = f'BMS {id} ' + sensor_info[0],
+                    key = f'bms{id}_' + sensor_info[1],
+                    device_class = sensor_info[2],
+                    state_class = sensor_info[3],
+                    unit = sensor_info[4],
+                    icon = sensor_info[5],
+                    entity_category = sensor_info[6],
+                )
+                entities.append(sensor)
 
     async_add_entities(entities)
     return True
@@ -90,13 +88,6 @@ class BydBoxSensor(SensorEntity):
         if not state_class is None:
             self._attr_state_class = state_class
         self._attr_entity_category = entity_category
-
-#        self._attr_state_class = SensorStateClass.MEASUREMENT
-#        if self._unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR :
-#            self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-#            self._attr_device_class = SensorDeviceClass.ENERGY
-#        if self._unit_of_measurement == UnitOfPower.WATT :
-#            self._attr_device_class = SensorDeviceClass.POWER
 
     async def async_added_to_hass(self):
         """Register callbacks."""
@@ -145,14 +136,11 @@ class BydBoxSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self):
-        #if self._key in ["status", "statusvendor"] and self.state in DEVICE_STATUSSES:
-        #    return {ATTR_STATUS_DESCRIPTION: DEVICE_STATUSSES[self.state]}
-        #elif "battery1" in self._key and "battery1_attrs" in self._hub.data:
-        #    return self._hub.data["battery1_attrs"]
-        #elif "battery2" in self._key and "battery2_attrs" in self._hub.data:
-        #    return self._hub.data["battery2_attrs"]
-        #elif "battery3" in self._key and "battery3_attrs" in self._hub.data:
-        #    return self._hub.data["battery3_attrs"]
+        if 'balancing_qty' in self._key:
+            return {'cell_flags': self._hub.data.get(f'{self._key[:4]}_cell_flags')}
+        if 'avg_c_v' in self._key:
+            return {'cell_voltages': self._hub.data.get(f'{self._key[:4]}_cell_voltages')}
+        
         return None
 
     @property

@@ -28,8 +28,21 @@ After reboot of Home-Assistant, this integration can be configured through the i
 | --- | --- |
 To come!
 
+### Battery Management System
+
+### Sensors
+| Entity  | Description |
+| --- | --- |
+
+### Diagnostic
+| Entity  | Description |
+| --- | --- |
+To come!
+
 # Example Devices
 ![bmu](images/bmu.png?raw=true "bmu")
+
+![bms](images/bmu.png?raw=true "bms")
 
 
 # References

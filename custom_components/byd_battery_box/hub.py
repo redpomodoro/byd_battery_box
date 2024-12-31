@@ -1,19 +1,22 @@
 """BYD Battery Box Hub."""
 from __future__ import annotations
 
-import requests
 import threading
 import logging
 import operator
 import threading
-from datetime import timedelta
-from typing import Optional
+from datetime import timedelta, datetime
+from typing import Optional, Literal
+import struct
+import asyncio
+#from typing import Generic, Literal, TypeVar, cast
 
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.core import HomeAssistant
 
 from pymodbus.client import ModbusTcpClient
+from pymodbus.utilities import unpack_bitstring
 
 from .const import (
     DOMAIN,
@@ -21,7 +24,11 @@ from .const import (
     APPLICATION_LIST,
     PHASE_LIST,
     ATTR_MANUFACTURER,
-    WORKING_AREA
+    WORKING_AREA,
+    BMU_ERRORS,
+    BMS_WARNINGS,
+    BMS_WARNINGS3,
+    BMS_ERRORS
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,7 +38,7 @@ class Hub:
 
     manufacturer = "BYD"
 
-    def __init__(self, hass: HomeAssistant, name: str, host: str, port: int, unit_id: int, scan_interval: int) -> None:
+    def __init__(self, hass: HomeAssistant, name: str, host: str, port: int, unit_id: int, scan_interval: int, scan_interval_bms: int = 600) -> None:
         """Init hub."""
         self._host = host
         self._port = port
@@ -41,29 +48,25 @@ class Hub:
         self._lock = threading.Lock()
         self._id = f'{name.lower()}_{host.lower().replace('.','')}'
         self.online = True     
-        #_LOGGER.error(f"pymodbus {version('pymodbus')}")          
+        #_LOGGER.warning(f"pymodbus {version('pymodbus')}")          
         self._client = ModbusTcpClient(host=host, port=port, framer='rtu', timeout=max(3, (scan_interval - 1))) 
         self._scan_interval = timedelta(seconds=scan_interval)
+        self._scan_interval_bms = timedelta(seconds=scan_interval_bms)
+        self._last_update_bms = None
         self._unsub_interval_method = None
         self._entities = []
+        self._bms_qty = 0
+        self._modules = 0
         self.data = {}
         self.data['unit_id'] = unit_id
 
-    #async def init_data(self):
-    #    return await self._hass.async_add_executor_job(self._init_data)
-
     async def init_data(self):
-        # try: 
-        #     result = self.read_info_data()
-        # except Exception as e:
-        #     _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id} {e}")
-        #     raise Exception(f"Error reading inverter info unit id: {self._unit_id}")
-        
         result = False
         try: 
             retries = 0
             while result==False and retries<4:
                 result = self.read_info_data()
+                await asyncio.sleep(.1)
                 retries += 1
         except Exception as e:
             _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id}", exc_info=True)
@@ -71,7 +74,6 @@ class Hub:
 
         if result == False:
             _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id}")
-            #raise Exception(f"Error reading inverter info unit id: {self._unit_id}")
 
         try:
             result = self.read_ext_info_data()
@@ -82,6 +84,12 @@ class Hub:
             result = self.read_status_data()
         except Exception as e:
             _LOGGER.error(f"Error reading status data", exc_info=True)
+
+        for bms_id in range(1, self._bms_qty + 1):
+            try:
+                result = await self.read_bms_status_data(bms_id)
+            except Exception as e:
+                _LOGGER.error(f"Error reading bms status data", exc_info=True)
 
         return True
 
@@ -102,7 +110,7 @@ class Hub:
             "name": f'Battery Management System {id}',
             "manufacturer": ATTR_MANUFACTURER,
             "model": self.data.get('model'),
-            "serial_number": self.data.get('serial'),
+            #"serial_number": self.data.get('serial'),
             "sw_version": self.data.get('bms_v'),
         }
     
@@ -137,9 +145,19 @@ class Hub:
     async def async_refresh_modbus_data(self, _now: Optional[int] = None) -> dict:
         """Time to update."""
         result : bool = await self._hass.async_add_executor_job(self._refresh_modbus_data)
+
+        if (datetime.now()-self._last_update_bms) > self._scan_interval_bms:
+            for bms_id in range(1, self._bms_qty + 1):
+                try:
+                    result = await self.read_bms_status_data(bms_id)
+                except Exception as e:
+                    _LOGGER.exception("Error reading bms status data", exc_info=True)
+                    result = False           
+
         if result:
             for update_callback in self._entities:
                 update_callback()
+
 
     def validate(self, value, comparison, against):
         ops = {
@@ -164,24 +182,24 @@ class Hub:
             return False
 
         try:
-            update_result = self.read_info_data()
+            result = self.read_info_data()
         except Exception as e:
             _LOGGER.exception("Error reading info data", exc_info=True)
-            update_result = False
+            result = False
 
         try:
-            update_result = self.read_ext_info_data()
+            result = self.read_ext_info_data()
         except Exception as e:
             _LOGGER.error(f"Error reading ext info data", exc_info=True)
-            update_result = False
+            result = False
 
         try:
-            update_result = self.read_status_data()
+            result = self.read_status_data()
         except Exception as e:
             _LOGGER.exception("Error reading status data", exc_info=True)
-            update_result = False
+            result = False
 
-        return update_result
+        return result
 
     async def test_connection(self) -> bool:
         """Test connectivity"""
@@ -242,6 +260,55 @@ class Hub:
         filter = ''.join([chr(i) for i in range(0, 32)])
         return value.translate(str.maketrans('', '', filter)).strip()
 
+    def convert_from_registers_int8(self, regs):
+        return [int(regs[0] >> 8), int(regs[0] & 0xFF)]
+
+    def convert_from_registers_int4(self, regs):
+        result = [int(regs[0] >> 4) & 0x0F, int(regs[0] & 0x0F)]
+        return result
+
+    def convert_from_registers(
+        cls, registers: list[int], data_type: ModbusTcpClient.DATATYPE, word_order: Literal["big", "little"] = "big"
+    ) -> int | float | str | list[bool] | list[int] | list[float]:
+        """Convert registers to int/float/str.
+
+        # TODO: remove this function once HA has been upgraded to later pymodbus version
+
+        :param registers: list of registers received from e.g. read_holding_registers()
+        :param data_type: data type to convert to
+        :param word_order: "big"/"little" order of words/registers
+        :returns: scalar or array of "data_type"
+        :raises ModbusException: when size of registers is not a multiple of data_type
+        """
+        if not (data_len := data_type.value[1]):
+            byte_list = bytearray()
+            if word_order == "little":
+                registers.reverse()
+            for x in registers:
+                byte_list.extend(int.to_bytes(x, 2, "big"))
+            if data_type == cls.DATATYPE.STRING:
+                trailing_nulls_begin = len(byte_list)
+                while trailing_nulls_begin > 0 and not byte_list[trailing_nulls_begin - 1]:
+                    trailing_nulls_begin -= 1
+                byte_list = byte_list[:trailing_nulls_begin]
+                return byte_list.decode("utf-8")
+            return unpack_bitstring(byte_list)
+        if (reg_len := len(registers)) % data_len:
+            raise Exception(
+                f"Registers illegal size ({len(registers)}) expected multiple of {data_len}!"
+            )
+
+        result = []
+        for i in range(0, reg_len, data_len):
+            regs = registers[i:i+data_len]
+            if word_order == "little":
+                regs.reverse()
+            byte_list = bytearray()
+            for x in regs:
+                byte_list.extend(int.to_bytes(x, 2, "big"))
+            result.append(struct.unpack(f">{data_type.value[0]}", byte_list)[0])
+        return result if len(result) != 1 else result[0]
+
     def get_inverter_model(self,model,id):
         # Mapping from Be_Connect (Setup Home) 
         if model == "LVS":                                     # LVS
@@ -288,20 +355,35 @@ class Hub:
         _LOGGER.error(f"unknown inverter. model: {model} inverter id: {id}")
         return "NA"
 
+    def bitmask_to_strings(self, bitmask, bitmaskList):
+        strings = []
+        for bit in range(16):
+            if bitmask & (1<<bit):
+                strings.append(bitmaskList[bit])
+        return strings
+    
+    def strings_to_string(self, strings):
+        if len(strings):
+            return ','.join(strings)
+        return 'Normal'
+
     def read_info_data(self):
         """start reading info data"""
-        data = self.read_holding_registers(
-            unit_id=self._unit_id, address=0x0000, count=20
-        )
+        data = self.read_holding_registers(unit_id=self._unit_id, address=0x0000, count=20)
         if data.isError():
             _LOGGER.error(f"info data modbus error. {self._host}:{self._port} unit_id {self._unit_id} data:{data}")
             return False
-
         regs = data.registers
 
         bmuSerial = self._client.convert_from_registers(regs[0:10], data_type = self._client.DATATYPE.STRING)[:-1]
-        self.data['serial'] = bmuSerial
-        #self.data['serial'] = "xxxxxxxxxxxxxxxxxxx"  # for screenshots
+        # 11-12 ?
+        bmu_v_A_1, bmu_v_A_2 = self.convert_from_registers_int8(regs[12:13])
+        bmu_v_B_1, bmu_v_B_2 = self.convert_from_registers_int8(regs[13:14])
+        bms_v1, bms_v2 = self.convert_from_registers_int8(regs[14:15])
+        bmu_area, bms_area = self.convert_from_registers_int8(regs[15:16])
+        towers, modules = self.convert_from_registers_int4(regs[16:17])
+        application_id, lvs_type_id = self.convert_from_registers_int8(regs[17:18])
+        phase_id = self.convert_from_registers_int8(regs[18:19])[0]
 
         if bmuSerial.startswith('P03') or bmuSerial.startswith('E0P3'):
             # Modules in Serial
@@ -310,32 +392,17 @@ class Hub:
             # Modules in Paralel
             bat_type = 'LV'
 
-        bmu_v_A_1 = regs[0x000C] >> 8
-        bmu_v_A_2 = regs[0x000C] & 0xFF
-        bmu_v_A = f'v{bmu_v_A_1}.{bmu_v_A_2}'
-        bmu_v_B_1 = regs[0x000D] >> 8
-        bmu_v_B_2 = regs[0x000D] & 0xFF
-        bmu_v_B = f'v{bmu_v_B_1}.{bmu_v_B_2}'
-        bms_v1 = regs[0x000E] >> 8
-        bms_v2 = regs[0x000E] & 0xFF
-        bms_v = f'v{bms_v1}.{bms_v2}'   
-
-        bmu_area = regs[0x000F] >> 8
-        bms_area = regs[0x000F] & 0xFF
+        bmu_v_A = f'{bmu_v_A_1}.{bmu_v_A_2}'
+        bmu_v_B = f'{bmu_v_B_1}.{bmu_v_B_2}'
+        bms_v = f'{bms_v1}.{bms_v2}'   
 
         if bmu_area == 0:
             bmu_v = bmu_v_A
         else:
             bmu_v = bmu_v_B
 
-        #inverter_id = (regs[0x0010] >> 8) & 0x0F
-        towers = (regs[0x0010] >> 4) & 0x0F
-        modules = regs[0x0010] & 0x0F
-
-        application_id = (regs[0x0011] >> 8) & 0xFF
-        lvs_type_id = regs[0x0011] & 0xFF
-        phase_id = (regs[0x0012] >> 8) & 0xFF
-         
+        self.data['serial'] = bmuSerial
+        self.data['serial'] = "xxxxxxxxxxxxxxxxxxx"  # for screenshots
         self.data['bat_type'] = bat_type
         self.data['bmu_v_A'] = bmu_v_A
         self.data['bmu_v_B'] = bmu_v_B
@@ -345,6 +412,8 @@ class Hub:
         self.data['bms_area'] = WORKING_AREA[bms_area]
         self.data['towers'] = towers       
         self.data['modules'] = modules       
+        self._bms_qty = towers
+        self._modules = modules
 
         self.data['application'] = APPLICATION_LIST[application_id]
         self.data['lvs_type'] = lvs_type_id
@@ -354,20 +423,14 @@ class Hub:
 
     def read_ext_info_data(self):
         """start reading info data"""
-        data = self.read_holding_registers(
-            unit_id=self._unit_id, address=0x0010, count=2
-        )
+        data = self.read_holding_registers(unit_id=self._unit_id, address=0x0010, count=2)
         if data.isError():
             _LOGGER.error(f"ext info data modbus error. {self._host}:{self._port} unit_id {self._unit_id} data:{data}")
             return False
-
         regs = data.registers
 
-        inverter_id = regs[0x0000] >> 8
-        hv_type_id = regs[0x0001] >> 8
-
-        modules = self.data['modules']
-        bms_qty = self.data['towers']
+        inverter_id = self.convert_from_registers_int8(regs[0:1])[0]
+        hv_type_id = self.convert_from_registers_int8(regs[1:2])[0]
 
         model = "NA"
         capacity_module = 0.0
@@ -386,39 +449,37 @@ class Hub:
           capacity_module = 2.76
           volt_n = 16
           temp_n = 8
-          cells_n = modules * volt_n
-          temps_n = modules * temp_n
+          cells_n = self._modules * volt_n
+          temps_n = self._modules * temp_n
         elif hv_type_id == 2:
           # HVS 32 cells per module
           model = "HVS"
           capacity_module = 2.56
           volt_n = 32
           temp_n = 12
-          cells_n = modules * volt_n
-          temps_n = modules * temp_n
+          cells_n = self._modules * volt_n
+          temps_n = self._modules * temp_n
         else:
           if self.data['bat_type'] == 'LV':
             model = "LVS"
             capacity_module = 4.0
             volt_n = 7
-            cells_n = modules * volt_n
+            cells_n = self._modules * volt_n
  
-        capacity = bms_qty * modules * capacity_module
+        capacity = self._bms_qty * self._modules * capacity_module
 
         self.data['inverter'] = self.get_inverter_model(model, inverter_id)
         self.data['model'] = model
         self.data['capacity'] = capacity
 
-       
+        return True
+
     def read_status_data(self):
         """start reading status data"""
-        data = self.read_holding_registers(
-            unit_id=self._unit_id, address=0x0500, count=21
-        )
+        data = self.read_holding_registers(unit_id=self._unit_id, address=0x0500, count=21)
         if data.isError():
             _LOGGER.error(f"status data modbus error. data:{data}")
             return False
-
         regs = data.registers
 
         soc = self._client.convert_from_registers(regs[0:1], data_type = self._client.DATATYPE.UINT16)
@@ -430,10 +491,16 @@ class Hub:
         max_cell_temp = self._client.convert_from_registers(regs[6:7], data_type = self._client.DATATYPE.INT16)
         min_cell_temp = self._client.convert_from_registers(regs[7:8], data_type = self._client.DATATYPE.INT16)
         bmu_temp = self._client.convert_from_registers(regs[8:9], data_type = self._client.DATATYPE.INT16)
-        error = self._client.convert_from_registers(regs[13:14], data_type = self._client.DATATYPE.UINT16)
+        # 9-12 ?
+        errors = self._client.convert_from_registers(regs[13:14], data_type = self._client.DATATYPE.UINT16)
+        param_t_v1, param_t_v2 = self.convert_from_registers_int8(regs[14:15]) 
         output_voltage = round(self._client.convert_from_registers(regs[16:17], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
-        charge_lfte = self._client.convert_from_registers(regs[17:19], data_type = self._client.DATATYPE.UINT32) * 0.001
-        discharge_lfte = self._client.convert_from_registers(regs[19:21], data_type = self._client.DATATYPE.UINT32) * 0.001
+        # TODO: change to use standard pymodbus function once HA has been upgraded to later version
+        charge_lfte = self.convert_from_registers(regs[17:19], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.1
+        discharge_lfte = self.convert_from_registers(regs[19:21], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.1
+
+        errors_list = self.bitmask_to_strings(errors, BMU_ERRORS)    
+        param_t_v = f"{param_t_v1}.{param_t_v2}"
         efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
 
         self.data['soc'] = soc
@@ -445,11 +512,120 @@ class Hub:
         self.data['max_cell_temp'] = max_cell_temp
         self.data['min_cell_temp'] = min_cell_temp
         self.data['bmu_temp'] = bmu_temp
-        self.data['error'] = error
+        self.data['errors'] = self.strings_to_string(errors_list)
+        self.data['param_t_v'] = param_t_v
         self.data['output_voltage'] = output_voltage
         self.data['power'] = current * output_voltage
         self.data['charge_lfte'] = charge_lfte
         self.data['discharge_lfte'] = discharge_lfte
         self.data['efficiency'] = efficiency
+        self.data[f'updated'] = datetime.now()
+
+        return True
+       
+    async def read_bms_status_data(self, bms_id):
+        """start reading status data"""
+
+        self._client.write_registers(0x0550, [bms_id,0x8100], slave=self._unit_id)
+        timeout = 5
+        i = 0
+        response_reg = 0
+        while response_reg != 0x8801 and i < timeout: # wait for the response
+            await asyncio.sleep(.1)
+            i += 0.1
+            try:
+                data = self.read_holding_registers(unit_id=self._unit_id, address=0x0550, count=1)
+            except Exception as e:
+                _LOGGER.error(f"bms status receive error. ", exc_info=True)
+            if not data.isError():
+                response_reg = data.registers[0]
+        await asyncio.sleep(.1)
+        data = self.read_holding_registers(
+            unit_id=self._unit_id, address=0x0558, count=65
+        )
+        if data.isError():
+            _LOGGER.error(f"bms status data modbus error. {self._unit_id} data:{data} ")
+            return False
+        regs = data.registers
+
+        # skip 1st register with length
+        max_voltage = round(self._client.convert_from_registers(regs[1:2], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
+        min_voltage = round(self._client.convert_from_registers(regs[2:3], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
+        max_voltage_cell_module, min_voltage_cell_module = self.convert_from_registers_int8(regs[3:4])
+        max_temp = self._client.convert_from_registers(regs[4:5], data_type = self._client.DATATYPE.INT16)
+        min_temp = self._client.convert_from_registers(regs[5:6], data_type = self._client.DATATYPE.INT16)
+        max_temp_cell_module, min_temp_cell_module = self.convert_from_registers_int8(regs[6:7])
+        cell_flags = []
+        j = 1
+        for i in range(7,15):  
+            first, second = self.convert_from_registers_int8(regs[i:i+1])
+            cell_flags.append({'c':j, 'f': first})
+            cell_flags.append({'c':j+1, 'f': second})
+            j += 2
+
+        # TODO: change to use standard pymodbus function once HA has been upgraded to later version
+        charge_lfte = self.convert_from_registers(regs[15:17], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.001
+        discharge_lfte = self.convert_from_registers(regs[17:19], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.001
+        # 20 ? 
+        bat_voltage = round(self._client.convert_from_registers(regs[21:22], data_type = self._client.DATATYPE.INT16) * 0.1,2)
+        # 22 ?
+        # 23 ? Switch State ?
+        output_voltage = round(self._client.convert_from_registers(regs[24:25], data_type = self._client.DATATYPE.INT16) * 0.1,2)
+        soc = round(self._client.convert_from_registers(regs[25:26], data_type = self._client.DATATYPE.INT16) * 0.1,2)
+        soh = self._client.convert_from_registers(regs[26:27], data_type = self._client.DATATYPE.INT16)
+        current = round(self._client.convert_from_registers(regs[27:28], data_type = self._client.DATATYPE.INT16) * 0.1,2)
+        warnings1 = self._client.convert_from_registers(regs[28:29], data_type = self._client.DATATYPE.UINT16)
+        warnings2 = self._client.convert_from_registers(regs[29:30], data_type = self._client.DATATYPE.UINT16)
+        warnings3 = self._client.convert_from_registers(regs[30:31], data_type = self._client.DATATYPE.UINT16)
+        # 31-48 ?
+        errors = self._client.convert_from_registers(regs[48:49], data_type = self._client.DATATYPE.UINT16)
+        cell_voltages = []
+        cell_voltages_dict = []
+        for i in range(49,65):
+             voltage = round(self._client.convert_from_registers(regs[i:i+1], data_type = self._client.DATATYPE.INT16) * 0.01,2)
+             cell_voltages.append(voltage)
+             cell_voltages_dict.append({'c':i-48,'v':voltage})
+
+        # calculate quantity cells balancing
+        balancing_cells = 0
+        for cell in cell_flags:
+           if cell['f'] & 1 == 1:
+              balancing_cells += 1
+
+        warnings_list = self.bitmask_to_strings(warnings1, BMS_WARNINGS) + self.bitmask_to_strings(warnings2, BMS_WARNINGS) + self.bitmask_to_strings(warnings3, BMS_WARNINGS3)
+        errors_list = self.bitmask_to_strings(errors, BMS_ERRORS)    
+        efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
+
+        avg_cell_voltage = round(sum(cell_voltages) / len(cell_voltages),2)
+
+        updated = datetime.now()
+        self._last_update_bms = updated
+
+        self.data[f'bms{bms_id}_max_c_v'] = max_voltage
+        self.data[f'bms{bms_id}_min_c_v'] = min_voltage
+        self.data[f'bms{bms_id}_max_c_v_id'] = max_voltage_cell_module
+        self.data[f'bms{bms_id}_min_c_v_id'] = min_voltage_cell_module
+        self.data[f'bms{bms_id}_max_c_t'] = max_temp
+        self.data[f'bms{bms_id}_min_c_t'] = min_temp
+        self.data[f'bms{bms_id}_max_c_t_id'] = max_temp_cell_module
+        self.data[f'bms{bms_id}_min_c_t_id'] = min_temp_cell_module
+        self.data[f'bms{bms_id}_balancing_qty']  = balancing_cells
+        self.data[f'bms{bms_id}_soc'] = soc
+        self.data[f'bms{bms_id}_soh'] = soh
+        self.data[f'bms{bms_id}_current'] = current
+        self.data[f'bms{bms_id}_bat_voltage'] = bat_voltage
+        self.data[f'bms{bms_id}_output_voltage'] = output_voltage
+        self.data[f'bms{bms_id}_charge_lfte'] = charge_lfte
+        self.data[f'bms{bms_id}_discharge_lfte'] = discharge_lfte
+        self.data[f'bms{bms_id}_efficiency'] = efficiency
+
+        self.data[f'bms{bms_id}_warnings'] = self.strings_to_string(warnings_list)
+        self.data[f'bms{bms_id}_errors'] = self.strings_to_string(errors_list)
+
+        self.data[f'bms{bms_id}_cell_flags'] = cell_flags
+        self.data[f'bms{bms_id}_cell_voltages'] = cell_voltages_dict
+        self.data[f'bms{bms_id}_avg_c_v'] = avg_cell_voltage
+
+        self.data[f'bms{bms_id}_updated'] = updated
 
         return True
