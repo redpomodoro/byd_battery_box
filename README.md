@@ -45,6 +45,34 @@ To come!
 ![bms](images/bmu.png?raw=true "bms")
 
 
+
+Apex char
+type: custom:apexcharts-card
+apex_config:
+  xaxis:
+    labels:
+      datetimeFormatter:
+        hour: HH
+graph_span: 15h
+span:
+  start: day
+  offset: +1h
+header:
+  show: true
+  title: Cell Voltages
+yaxis:
+  - decimals: 2
+series:
+  - entity: sensor.bms_1_cells_average_voltage
+    type: column
+    stroke_width: 2
+    float_precision: 2
+    data_generator: |
+      return entity.attributes.cell_voltages.map((entry) => { 
+      return [(new Date()).setHours(entry.c), entry.v];
+      });
+
+
 # References
 https://github.com/sarnau/BYD-Battery-Box-Infos/blob/main/Read_Modbus.py
 https://github.com/christianh17/ioBroker.bydhvs/blob/master/docs/byd-hexstructure.md
