@@ -39,17 +39,10 @@ To come!
 | --- | --- |
 To come!
 
-# Example Devices
-![bmu](images/bmu.png?raw=true "bmu")
-
-![bms](images/bmu.png?raw=true "bms")
-
-
+### Apexcharts
 ![cell voltages](images/cell_voltages.png?raw=true "cell voltages")
 
-
-
-Apex char
+```
 type: custom:apexcharts-card
 apex_config:
   xaxis:
@@ -74,6 +67,12 @@ series:
       return entity.attributes.cell_voltages.map((entry) => { 
       return [(new Date()).setHours(entry.c), entry.v];
       });
+```
+
+# Example Devices
+![bmu](images/bmu.png?raw=true "bmu")
+
+![bms](images/bmu.png?raw=true "bms")
 
 
 # References
