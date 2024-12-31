@@ -402,7 +402,7 @@ class Hub:
             bmu_v = bmu_v_B
 
         self.data['serial'] = bmuSerial
-        self.data['serial'] = "xxxxxxxxxxxxxxxxxxx"  # for screenshots
+        #self.data['serial'] = "xxxxxxxxxxxxxxxxxxx"  # for screenshots
         self.data['bat_type'] = bat_type
         self.data['bmu_v_A'] = bmu_v_A
         self.data['bmu_v_B'] = bmu_v_B
