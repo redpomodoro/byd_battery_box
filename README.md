@@ -65,7 +65,7 @@ series:
     float_precision: 2
     data_generator: |
       return entity.attributes.cell_voltages.map((entry) => { 
-      return [(new Date()).setHours(entry.c), entry.v];
+      return [(new Date()).setHours(entry.c,0), entry.v];
       });
 ```
 
