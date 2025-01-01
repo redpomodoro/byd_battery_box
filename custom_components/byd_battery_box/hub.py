@@ -582,7 +582,7 @@ class Hub:
         cell_voltages = []
         cell_voltages_dict = []
         for i in range(49,65):
-             voltage = round(self._client.convert_from_registers(regs[i:i+1], data_type = self._client.DATATYPE.INT16) * 0.01,2)
+             voltage = round(self._client.convert_from_registers(regs[i:i+1], data_type = self._client.DATATYPE.INT16) * 0.001,2)
              cell_voltages.append(voltage)
              cell_voltages_dict.append({'c':i-48,'v':voltage})
 
