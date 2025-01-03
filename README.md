@@ -13,7 +13,8 @@ Home assistant Custom Component for reading data from BYD Battery Box. This inte
 Copy contents of custom_components folder to your home-assistant config/custom_components folder or install through HACS.
 After reboot of Home-Assistant, this integration can be configured through the integration setup UI.
 
-
+> [!CAUTION]
+> Note using other applications connecting to battery simulatousnely might give unexpected results. 
 
 # Usage
 
@@ -72,7 +73,7 @@ series:
 # Example Devices
 ![bmu](images/bmu.png?raw=true "bmu")
 
-![bms](images/bmu.png?raw=true "bms")
+![bms](images/bms.png?raw=true "bms")
 
 
 # References
