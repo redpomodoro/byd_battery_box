@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
+import asyncio
 from homeassistant import config_entries, exceptions
 from homeassistant.core import HomeAssistant
 
@@ -65,13 +65,14 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
 
     try:
         hub = Hub(hass, data[CONF_NAME], data[CONF_HOST], data[CONF_PORT], data[CONF_UNIT_ID], data[CONF_SCAN_INTERVAL], data[CONF_BMS_SCAN_INTERVAL])
-        await hub.init_data()
+        await hub.init_data(close=True)
     except Exception as e:
         # If there is an error, raise an exception to notify HA that there was a
         # problem. The UI will also show there was a problem
         _LOGGER.error(f"Cannot start hub {e}")
         raise CannotConnect
 
+    await asyncio.sleep(.1)
     #result = await hub.test_connection()
     #if not result:
     #    raise CannotConnect

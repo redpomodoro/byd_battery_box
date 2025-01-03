@@ -10,6 +10,9 @@ from typing import Optional, Literal
 import struct
 import asyncio
 #from typing import Generic, Literal, TypeVar, cast
+#from importlib.metadata import version
+#import pkg_resources
+#import platform
 
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_time_interval
@@ -17,6 +20,7 @@ from homeassistant.core import HomeAssistant
 
 from pymodbus.client import ModbusTcpClient
 from pymodbus.utilities import unpack_bitstring
+from pymodbus.exceptions import ModbusIOException
 
 from .const import (
     DOMAIN,
@@ -48,29 +52,38 @@ class Hub:
         self._lock = threading.Lock()
         self._id = f'{name.lower()}_{host.lower().replace('.','')}'
         self.online = True     
-        #_LOGGER.warning(f"pymodbus {version('pymodbus')}")          
-        self._client = ModbusTcpClient(host=host, port=port, framer='rtu', timeout=max(3, (scan_interval - 1))) 
-        self._scan_interval = timedelta(seconds=scan_interval)
-        self._scan_interval_bms = timedelta(seconds=scan_interval_bms)
+        #_LOGGER.debug(f"pymodbus {version('pymodbus')}")      # Python 3.8
+        #_LOGGER.debug(f"pymodbus {pkg_resources.get_distribution("simplegist").version}")
+        #_LOGGER.debug(f'python: {platform.python_version()}')
+
+        self._initialized = False
         self._last_update_bms = None
         self._unsub_interval_method = None
         self._entities = []
         self._bms_qty = 0
         self._modules = 0
+        self._cells = 0 # number of cells per module
+        self._temps = 0 # number of temp sensors per module
         self.data = {}
         self.data['unit_id'] = unit_id
+        self._scan_interval = timedelta(seconds=scan_interval)
+        self._scan_interval_bms = timedelta(seconds=scan_interval_bms)
+        self._client = ModbusTcpClient(host=host, port=port, framer='rtu', timeout=max(3, (scan_interval - 1))) 
 
-    async def init_data(self):
+    async def init_data(self, close = False, read_status_data = False):
         result = False
+
+        self.connect()
         try: 
             retries = 0
+            result = self.read_info_data()
             while result==False and retries<4:
-                result = self.read_info_data()
                 await asyncio.sleep(.1)
+                result = self.read_info_data()
                 retries += 1
         except Exception as e:
-            _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id}", exc_info=True)
-            raise Exception(f"Error reading inverter info unit id: {self._unit_id}")
+            _LOGGER.error(f"Error reading base info {self._host}:{self._port} unit id: {self._unit_id}", exc_info=True)
+            raise Exception(f"Error reading base info unit id: {self._unit_id}")
 
         if result == False:
             _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id}")
@@ -79,17 +92,25 @@ class Hub:
             result = self.read_ext_info_data()
         except Exception as e:
             _LOGGER.error(f"Error reading ext info data", exc_info=True)
+            raise Exception(f"Error reading ext info unit id: {self._unit_id}")
 
-        try:
-            result = self.read_status_data()
-        except Exception as e:
-            _LOGGER.error(f"Error reading status data", exc_info=True)
-
-        for bms_id in range(1, self._bms_qty + 1):
+        if read_status_data:
             try:
-                result = await self.read_bms_status_data(bms_id)
+                result = self.read_bmu_status_data()
             except Exception as e:
-                _LOGGER.error(f"Error reading bms status data", exc_info=True)
+                _LOGGER.error(f"Error reading status data", exc_info=True)
+
+            for bms_id in range(1, self._bms_qty + 1):
+                try:
+                    result = await self.read_bms_status_data(bms_id)
+                except Exception as e:
+                    _LOGGER.error(f"Error reading bms status data", exc_info=True)
+
+        if close:
+            self.close()
+        self._initialized = True
+
+        _LOGGER.debug(f"init done. data: {self.data}")          
 
         return True
 
@@ -144,9 +165,18 @@ class Hub:
 
     async def async_refresh_modbus_data(self, _now: Optional[int] = None) -> dict:
         """Time to update."""
+        # Skip if init isn't done yet
+        if self._initialized == False:
+            return
+        
         result : bool = await self._hass.async_add_executor_job(self._refresh_modbus_data)
 
-        if (datetime.now()-self._last_update_bms) > self._scan_interval_bms:
+        if result == False:
+            return 
+        for update_callback in self._entities:
+            update_callback()
+
+        if self._last_update_bms is None or ((datetime.now()-self._last_update_bms) > self._scan_interval_bms):
             for bms_id in range(1, self._bms_qty + 1):
                 try:
                     result = await self.read_bms_status_data(bms_id)
@@ -157,7 +187,6 @@ class Hub:
         if result:
             for update_callback in self._entities:
                 update_callback()
-
 
     def validate(self, value, comparison, against):
         ops = {
@@ -179,22 +208,24 @@ class Hub:
 
         if not self._check_and_reconnect():
             #if not connected, skip
-            return False
+            if not self._client.connected:
+                _LOGGER.debug("Client not conenected skip update")
+                return False
+
+        # try:
+        #     result = self.read_info_data()
+        # except Exception as e:
+        #     _LOGGER.exception("Error reading info data", exc_info=True)
+        #     result = False
+
+        # try:
+        #     result = self.read_ext_info_data()
+        # except Exception as e:
+        #     _LOGGER.error(f"Error reading ext info data", exc_info=True)
+        #     result = False
 
         try:
-            result = self.read_info_data()
-        except Exception as e:
-            _LOGGER.exception("Error reading info data", exc_info=True)
-            result = False
-
-        try:
-            result = self.read_ext_info_data()
-        except Exception as e:
-            _LOGGER.error(f"Error reading ext info data", exc_info=True)
-            result = False
-
-        try:
-            result = self.read_status_data()
+            result = self.read_bmu_status_data()
         except Exception as e:
             _LOGGER.exception("Error reading status data", exc_info=True)
             result = False
@@ -237,11 +268,25 @@ class Hub:
 
     def read_holding_registers(self, unit_id, address, count):
         """Read holding registers."""
-        _LOGGER.info(f"read registers a: {address} s: {unit_id} c {count}")
+        _LOGGER.debug(f"read registers a: {address} s: {unit_id} c {count} {self._client.connected}")
         with self._lock:
             return self._client.read_holding_registers(
                 address=address, count=count, slave=unit_id
             )
+
+    def get_registers(self, address, count, retries = 0):
+        data = self.read_holding_registers( unit_id=self._unit_id, address=address, count=count)
+        if data.isError():
+            if isinstance(data,ModbusIOException):
+                if retries < 1:
+                    _LOGGER.debug(f"IO Error: {data}. Retrying...")
+                    return self.get_registers(address=address, count=count, retries = retries + 1)
+                else:
+                    _LOGGER.error(f"error reading register: {address} count: {count} unit id: {self._unit_id} error: {data} ")
+            else:
+                _LOGGER.error(f"error reading register: {address} count: {count} unit id: {self._unit_id} error: {data} ")
+            return None
+        return data.registers
 
     def write_registers(self, unit_id, address, payload):
         """Write registers."""
@@ -364,16 +409,14 @@ class Hub:
     
     def strings_to_string(self, strings):
         if len(strings):
-            return ','.join(strings)
+            return ','.join(strings)[255:]
         return 'Normal'
 
     def read_info_data(self):
         """start reading info data"""
-        data = self.read_holding_registers(unit_id=self._unit_id, address=0x0000, count=20)
-        if data.isError():
-            _LOGGER.error(f"info data modbus error. {self._host}:{self._port} unit_id {self._unit_id} data:{data}")
+        regs = self.get_registers(address=0x0000, count=20)
+        if regs is None:
             return False
-        regs = data.registers
 
         bmuSerial = self._client.convert_from_registers(regs[0:10], data_type = self._client.DATATYPE.STRING)[:-1]
         # 11-12 ?
@@ -423,19 +466,15 @@ class Hub:
 
     def read_ext_info_data(self):
         """start reading info data"""
-        data = self.read_holding_registers(unit_id=self._unit_id, address=0x0010, count=2)
-        if data.isError():
-            _LOGGER.error(f"ext info data modbus error. {self._host}:{self._port} unit_id {self._unit_id} data:{data}")
+        regs = self.get_registers(address=0x0010, count=2)
+        if regs is None:
             return False
-        regs = data.registers
 
         inverter_id = self.convert_from_registers_int8(regs[0:1])[0]
         hv_type_id = self.convert_from_registers_int8(regs[1:2])[0]
 
         model = "NA"
         capacity_module = 0.0
-        volt_n = 0
-        temp_n = 0
         cells_n = 0
         temps_n = 0
 
@@ -447,24 +486,22 @@ class Hub:
           # HVM 16 Cells per module
           model = "HVM"
           capacity_module = 2.76
-          volt_n = 16
-          temp_n = 8
-          cells_n = self._modules * volt_n
-          temps_n = self._modules * temp_n
+          cells_n = 16
+          temps_n = 8
         elif hv_type_id == 2:
           # HVS 32 cells per module
           model = "HVS"
           capacity_module = 2.56
-          volt_n = 32
-          temp_n = 12
-          cells_n = self._modules * volt_n
-          temps_n = self._modules * temp_n
+          cells_n = 32
+          temps_n = 12
         else:
           if self.data['bat_type'] == 'LV':
             model = "LVS"
             capacity_module = 4.0
-            volt_n = 7
-            cells_n = self._modules * volt_n
+            cells_n = 7
+
+        self._cells = cells_n
+        self._temps = temps_n
  
         capacity = self._bms_qty * self._modules * capacity_module
 
@@ -474,13 +511,11 @@ class Hub:
 
         return True
 
-    def read_status_data(self):
-        """start reading status data"""
-        data = self.read_holding_registers(unit_id=self._unit_id, address=0x0500, count=21)
-        if data.isError():
-            _LOGGER.error(f"status data modbus error. data:{data}")
+    def read_bmu_status_data(self):
+        """start reading bmu status data"""
+        regs = self.get_registers(address=0x0500, count=21) # 1280
+        if regs is None:
             return False
-        regs = data.registers
 
         soc = self._client.convert_from_registers(regs[0:1], data_type = self._client.DATATYPE.UINT16)
         max_cell_voltage = round(self._client.convert_from_registers(regs[1:2], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
@@ -523,6 +558,7 @@ class Hub:
 
         return True
        
+
     async def read_bms_status_data(self, bms_id):
         """start reading status data"""
 
@@ -531,26 +567,41 @@ class Hub:
         i = 0
         response_reg = 0
         while response_reg != 0x8801 and i < timeout: # wait for the response
-            await asyncio.sleep(.1)
-            i += 0.1
+            await asyncio.sleep(.2)
+            i += 0.2
             try:
                 data = self.read_holding_registers(unit_id=self._unit_id, address=0x0550, count=1)
             except Exception as e:
-                _LOGGER.error(f"bms status receive error. ", exc_info=True)
+                _LOGGER.error(f"read bms status error while waiting for response.", exc_info=True)
             if not data.isError():
                 response_reg = data.registers[0]
-        await asyncio.sleep(.1)
-        data = self.read_holding_registers(
-            unit_id=self._unit_id, address=0x0558, count=65
-        )
-        if data.isError():
-            _LOGGER.error(f"bms status data modbus error. {self._unit_id} data:{data} ")
+        if response_reg == 0:
+            _LOGGER.error(f"read bms status error timeout.", exc_info=True)
             return False
-        regs = data.registers
+        await asyncio.sleep(.1)
+
+        regs = []
+        for i in range(0,4):
+            new_regs = self.get_registers(address=0x0558, count=65)
+            if new_regs is None:
+                _LOGGER.error(f"failed reading bms status part: {i}", exc_info=True)
+            else:
+                regs = regs + new_regs
+
+        if len(regs) == 0:
+            _LOGGER.error(f"missing bmu status regs empty")
+            return False
+
+        if not len(regs) == 260:
+            _LOGGER.error(f"unexpected number of bmu status regs: {len(regs)}")
+            return False
 
         # skip 1st register with length
-        max_voltage = round(self._client.convert_from_registers(regs[1:2], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
-        min_voltage = round(self._client.convert_from_registers(regs[2:3], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
+        max_voltage = round(self._client.convert_from_registers(regs[1:2], data_type = self._client.DATATYPE.INT16) * 0.001,3)
+        if max_voltage > 5:
+            _LOGGER.error(f"bms {bms_id} unexpected max voltage {max_voltage}", exc_info=True)
+            return False
+        min_voltage = round(self._client.convert_from_registers(regs[2:3], data_type = self._client.DATATYPE.INT16) * 0.001,3)
         max_voltage_cell_module, min_voltage_cell_module = self.convert_from_registers_int8(regs[3:4])
         max_temp = self._client.convert_from_registers(regs[4:5], data_type = self._client.DATATYPE.INT16)
         min_temp = self._client.convert_from_registers(regs[5:6], data_type = self._client.DATATYPE.INT16)
@@ -567,9 +618,12 @@ class Hub:
         charge_lfte = self.convert_from_registers(regs[15:17], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.001
         discharge_lfte = self.convert_from_registers(regs[17:19], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.001
         # 20 ? 
+        _LOGGER.debug(f'bms {bms_id} reg 20: {regs[20]}')
         bat_voltage = round(self._client.convert_from_registers(regs[21:22], data_type = self._client.DATATYPE.INT16) * 0.1,2)
         # 22 ?
+        _LOGGER.debug(f'bms {bms_id} reg 22: {regs[22]}')
         # 23 ? Switch State ?
+        _LOGGER.debug(f'bms {bms_id} reg 23: {regs[23]}')
         output_voltage = round(self._client.convert_from_registers(regs[24:25], data_type = self._client.DATATYPE.INT16) * 0.1,2)
         soc = round(self._client.convert_from_registers(regs[25:26], data_type = self._client.DATATYPE.INT16) * 0.1,2)
         soh = self._client.convert_from_registers(regs[26:27], data_type = self._client.DATATYPE.INT16)
@@ -577,14 +631,33 @@ class Hub:
         warnings1 = self._client.convert_from_registers(regs[28:29], data_type = self._client.DATATYPE.UINT16)
         warnings2 = self._client.convert_from_registers(regs[29:30], data_type = self._client.DATATYPE.UINT16)
         warnings3 = self._client.convert_from_registers(regs[30:31], data_type = self._client.DATATYPE.UINT16)
-        # 31-48 ?
+        # 31-47 ?
+        _LOGGER.debug(f'bms {bms_id} reg 31-47: {regs[31:48]}')
         errors = self._client.convert_from_registers(regs[48:49], data_type = self._client.DATATYPE.UINT16)
         cell_voltages = []
         cell_voltages_dict = []
-        for i in range(49,65):
-             voltage = round(self._client.convert_from_registers(regs[i:i+1], data_type = self._client.DATATYPE.INT16) * 0.001,2)
-             cell_voltages.append(voltage)
-             cell_voltages_dict.append({'c':i-48,'v':voltage})
+
+        cell_temps = []
+        cell_temps_dict = []
+
+        regs_voltages = regs[49:65] + regs[66:130] + regs[131:180]
+        regs_temps = regs[180:195] + regs[196:213] 
+
+        temp_parts = 0
+        if self._temps > 0:
+            temp_parts = round(self._temps/2)
+
+        for m in range(0,self._modules):
+            for i in range(0,self._cells):
+                 voltage = round(self._client.convert_from_registers(regs_voltages[i+m*8:i+m*8+1], data_type = self._client.DATATYPE.INT16) * 0.001,3)
+                 cell_voltages.append(voltage)
+                 cell_voltages_dict.append({'m':m, 'c':i, 'v':voltage})
+            for i in range(0,temp_parts):
+                temp1, temp2 = self.convert_from_registers_int8(regs_temps[i+m*4:i+m*4+1])
+                cell_temps.append(temp1)
+                cell_temps.append(temp2)
+                cell_temps_dict.append({'m':m, 'i':i*2, 't':temp1})
+                cell_temps_dict.append({'m':m, 'i':i*2+1, 't':temp2})
 
         # calculate quantity cells balancing
         balancing_cells = 0
@@ -597,6 +670,7 @@ class Hub:
         efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
 
         avg_cell_voltage = round(sum(cell_voltages) / len(cell_voltages),2)
+        avg_cell_temp = round(sum(cell_temps) / len(cell_temps),1)
 
         updated = datetime.now()
         self._last_update_bms = updated
@@ -625,6 +699,9 @@ class Hub:
         self.data[f'bms{bms_id}_cell_flags'] = cell_flags
         self.data[f'bms{bms_id}_cell_voltages'] = cell_voltages_dict
         self.data[f'bms{bms_id}_avg_c_v'] = avg_cell_voltage
+
+        self.data[f'bms{bms_id}_cell_temps'] = cell_temps_dict
+        self.data[f'bms{bms_id}_avg_c_t'] = avg_cell_temp
 
         self.data[f'bms{bms_id}_updated'] = updated
 
