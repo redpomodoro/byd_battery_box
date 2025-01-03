@@ -48,51 +48,46 @@ To come!
 Voltages Table
 ```
 type: markdown
-content: >-
-  <table border="1">
-  {% set modules = state_attr('sensor.bms_1_cells_average_voltage','cell_voltages')%}
-  <tr><th>Module</th>
-  {% for i in range(1,17) %}
-  <th> Cell {{i}} </th>
+content: >+
+  {% set modules =
+  state_attr('sensor.bms_1_cells_average_voltage','cell_voltages')%}
+  |Module|{% for i in range(1,17) %}Cell {{i}}|{%- endfor %}
+
+  |:---|{% for i in range(1,17) %}---:|{% endfor %}
+
+  {% for m in modules %}{% set cells =  m['v'] %}|{{ m['m'] }}|{% for v in cells
+  %}{{ v }}|
+
   {%- endfor %}
-  {% for m in modules %}
-  <tr><td>{{ m['m'] }}</td>
-  {% set cells =  m['v'] %}
-  {% for v in cells %}
-  <td>{{ v }}</td>
-  {%- endfor %}
-  </tr>
-  {%- endfor %}
-  </table>
-title: Module Voltages
+
+  {% endfor %}
+title: Module Voltages in V
 grid_options:
   columns: 24
-  rows: 4
+  rows: auto
 ```
 
 Temperatures Table
 ```
 type: markdown
-content: >+
-  <table border="1">
-  {% set modules = state_attr('sensor.bms_1_cells_average_temperature','cell_temps')%}
-  <tr><th>Module</th>
-  {% for i in range(1,9) %}
-  <th>Sensor {{i}}</th>
+content: >
+  {% set modules =
+  state_attr('sensor.bms_1_cells_average_temperature','cell_temps')%}
+
+  |Module|{% for i in range(1,9) %}Sensor {{i}}|{%- endfor %}
+
+  |:---|{% for i in range(1,9) %}---:|{% endfor %}
+
+  {% for m in modules %}{% set cells =  m['t'] %}|{{ m['m'] }}|{% for v in cells
+  %}{{ v }}|
+
   {%- endfor %}
-  {% for m in modules %}
-  <tr><td>{{ m['m'] }}</td>
-  {% set cells =  m['t'] %}
-  {% for v in cells %}
-  <td>{{ v }}</td>
-  {%- endfor %}
-  </tr>
-  {%- endfor %}
-  </table>
-title: Module Temperatures
+
+  {% endfor %}
+title: Module Temperatures in °C
 grid_options:
   columns: 24
-  rows: 4
+  rows: auto
 ```
 
 
