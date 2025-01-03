@@ -419,7 +419,8 @@ class Hub:
             return False
 
         bmuSerial = self._client.convert_from_registers(regs[0:10], data_type = self._client.DATATYPE.STRING)[:-1]
-        # 11-12 ?
+        # 10-12 ?
+        _LOGGER.debug(f'bmu reg 10-12: {regs[10:12]}')
         bmu_v_A_1, bmu_v_A_2 = self.convert_from_registers_int8(regs[12:13])
         bmu_v_B_1, bmu_v_B_2 = self.convert_from_registers_int8(regs[13:14])
         bms_v1, bms_v2 = self.convert_from_registers_int8(regs[14:15])
@@ -427,6 +428,8 @@ class Hub:
         towers, modules = self.convert_from_registers_int4(regs[16:17])
         application_id, lvs_type_id = self.convert_from_registers_int8(regs[17:18])
         phase_id = self.convert_from_registers_int8(regs[18:19])[0]
+        # 19-21 ?
+        _LOGGER.debug(f'bmu reg 19-21: {regs[19:21]}')
 
         if bmuSerial.startswith('P03') or bmuSerial.startswith('E0P3'):
             # Modules in Serial
@@ -527,6 +530,7 @@ class Hub:
         min_cell_temp = self._client.convert_from_registers(regs[7:8], data_type = self._client.DATATYPE.INT16)
         bmu_temp = self._client.convert_from_registers(regs[8:9], data_type = self._client.DATATYPE.INT16)
         # 9-12 ?
+        _LOGGER.debug(f'bmu status reg 9-12: {regs[9:13]}')
         errors = self._client.convert_from_registers(regs[13:14], data_type = self._client.DATATYPE.UINT16)
         param_t_v1, param_t_v2 = self.convert_from_registers_int8(regs[14:15]) 
         output_voltage = round(self._client.convert_from_registers(regs[16:17], data_type = self._client.DATATYPE.UINT16) * 0.01,2)
