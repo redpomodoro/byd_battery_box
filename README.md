@@ -95,36 +95,6 @@ grid_options:
 ```
 
 
-### Apexcharts
-![cell voltages](images/cell_voltages.png?raw=true "cell voltages")
-
-```
-type: custom:apexcharts-card
-apex_config:
-  xaxis:
-    labels:
-      datetimeFormatter:
-        hour: HH
-graph_span: 15h
-span:
-  start: day
-  offset: +1h
-header:
-  show: true
-  title: Cell Voltages
-yaxis:
-  - decimals: 2
-series:
-  - entity: sensor.bms_1_cells_average_voltage
-    type: column
-    stroke_width: 2
-    float_precision: 2
-    data_generator: |
-      return entity.attributes.cell_voltages.map((entry) => { 
-      return [(new Date()).setHours(entry.c,0), entry.v];
-      });
-```
-
 # Example Devices
 ![bmu](images/bmu.png?raw=true "bmu")
 
