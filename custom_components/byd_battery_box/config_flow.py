@@ -38,7 +38,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DATA_SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_NAME, default=DEFAULT_NAME): str,
+#        vol.Optional(CONF_NAME, default=DEFAULT_NAME): str,
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
         vol.Required(CONF_UNIT_ID, default=DEFAULT_UNIT_ID): int,
@@ -114,9 +114,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except BmsScanIntervalTooShort:
                 errors["base"] = "bms_scan_interval_too_short"
             except InvalidPort:
-                errors["base"] = "bms_scan_interval_too_short"
-            except BmsScanIntervalTooShort:
-                errors["port"] = "invalid_port"
+                errors["base"] = "invalid_port"
                 # The error string is set here, and should be translated.
                 # This example does not currently cover translations, see the
                 # comments on `DATA_SCHEMA` for further details.
