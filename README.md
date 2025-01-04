@@ -40,6 +40,61 @@ To come!
 | --- | --- |
 To come!
 
+
+### Markdown Cards
+
+![markdowncards](images/markdowncards.png?raw=true "markdowncards")
+
+Voltages Table
+```
+type: markdown
+style: |
+  ha-card {
+    width: 100%;
+  }
+content: >
+  {% set modules =
+  state_attr('sensor.bms_1_cells_average_voltage','cell_voltages')%} | |{% for i
+  in range(1,17) %}Cell {{i}}|{%- endfor %}
+
+  |:---|{% for i in range(1,17) %}---:|{% endfor %}
+
+  {% for m in modules %}{% set cells =  m['v'] %}|Module {{ m['m'] }}|{% for v
+  in cells %}{{ v }}|
+
+  {%- endfor %}
+
+  {% endfor %}
+title: Module Voltages in mV
+grid_options:
+  columns: full
+  rows: auto
+```
+
+Temperatures Table
+```
+type: markdown
+content: >
+  {% set modules =
+  state_attr('sensor.bms_1_cells_average_temperature','cell_temps')%}
+
+  | |{% for i in range(1,9) %}Cell {{i*2-1}}-{{i*2}}|{%- endfor %}
+
+  |:---|{% for i in range(1,9) %}---:|{% endfor %}
+
+  {% for m in modules %}{% set cells =  m['t'] %}|Module {{ m['m'] }}|{% for v
+  in cells %}{{ v }}|
+
+  {%- endfor %}
+
+  {% endfor %}
+title: Module Temperatures in °C
+grid_options:
+  columns: full
+  rows: auto
+```
+
+
 ### Apexcharts
 ![cell voltages](images/cell_voltages.png?raw=true "cell voltages")
 
