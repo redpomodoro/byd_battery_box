@@ -212,18 +212,6 @@ class Hub:
                 _LOGGER.debug("Client not conenected skip update")
                 return False
 
-        # try:
-        #     result = self.read_info_data()
-        # except Exception as e:
-        #     _LOGGER.exception("Error reading info data", exc_info=True)
-        #     result = False
-
-        # try:
-        #     result = self.read_ext_info_data()
-        # except Exception as e:
-        #     _LOGGER.error(f"Error reading ext info data", exc_info=True)
-        #     result = False
-
         try:
             result = self.read_bmu_status_data()
         except Exception as e:
@@ -478,8 +466,8 @@ class Hub:
 
         model = "NA"
         capacity_module = 0.0
-        cells_n = 0
-        temps_n = 0
+        cells = 0
+        sensors_t = 0
 
         if hv_type_id == 0:
           # HVL -> Lithium Iron Phosphate (LFP), 3-8 Module (12kWh-32kWh), unknown specification, so 0 cells and 0 temps
@@ -489,28 +477,30 @@ class Hub:
           # HVM 16 Cells per module
           model = "HVM"
           capacity_module = 2.76
-          cells_n = 16
-          temps_n = 8
+          cells = 16
+          sensors_t = 8
         elif hv_type_id == 2:
           # HVS 32 cells per module
           model = "HVS"
           capacity_module = 2.56
-          cells_n = 32
-          temps_n = 12
+          cells = 32
+          sensors_t = 12
         else:
           if self.data['bat_type'] == 'LV':
             model = "LVS"
             capacity_module = 4.0
-            cells_n = 7
+            cells = 7
 
-        self._cells = cells_n
-        self._temps = temps_n
+        self._cells = cells
+        self._temps = sensors_t
  
         capacity = self._bms_qty * self._modules * capacity_module
 
         self.data['inverter'] = self.get_inverter_model(model, inverter_id)
         self.data['model'] = model
         self.data['capacity'] = capacity
+        self.data['sensors_t'] = sensors_t
+        self.data['cells'] = cells
 
         return True
 
@@ -592,10 +582,6 @@ class Hub:
             else:
                 regs = regs + new_regs
 
-        if len(regs) == 0:
-            _LOGGER.error(f"missing bmu status regs empty")
-            return False
-
         if not len(regs) == 260:
             _LOGGER.error(f"unexpected number of bmu status regs: {len(regs)}")
             return False
@@ -638,30 +624,31 @@ class Hub:
         # 31-47 ?
         _LOGGER.debug(f'bms {bms_id} reg 31-47: {regs[31:48]}')
         errors = self._client.convert_from_registers(regs[48:49], data_type = self._client.DATATYPE.UINT16)
-        cell_voltages = []
-        cell_voltages_dict = []
-
-        cell_temps = []
-        cell_temps_dict = []
+        all_cell_voltages = []
+        cell_voltages= [] # list of dict
 
         regs_voltages = regs[49:65] + regs[66:130] + regs[131:180]
         regs_temps = regs[180:195] + regs[196:213] 
+
+        all_cell_temps = []
+        cell_temps = [] # list of dict
 
         temp_parts = 0
         if self._temps > 0:
             temp_parts = round(self._temps/2)
 
         for m in range(0,self._modules):
+            values = []
             for i in range(0,self._cells):
-                 voltage = round(self._client.convert_from_registers(regs_voltages[i+m*8:i+m*8+1], data_type = self._client.DATATYPE.INT16) * 0.001,3)
-                 cell_voltages.append(voltage)
-                 cell_voltages_dict.append({'m':m, 'c':i, 'v':voltage})
+                 voltage = self._client.convert_from_registers(regs_voltages[i+m*16:i+m*16+1], data_type = self._client.DATATYPE.INT16)
+                 values.append(voltage)
+            all_cell_voltages += values
+            cell_voltages.append({'m':m+1, 'v':values})
+            values = []
             for i in range(0,temp_parts):
-                temp1, temp2 = self.convert_from_registers_int8(regs_temps[i+m*4:i+m*4+1])
-                cell_temps.append(temp1)
-                cell_temps.append(temp2)
-                cell_temps_dict.append({'m':m, 'i':i*2, 't':temp1})
-                cell_temps_dict.append({'m':m, 'i':i*2+1, 't':temp2})
+                values += self.convert_from_registers_int8(regs_temps[i+m*4:i+m*4+1])
+            all_cell_temps += values
+            cell_temps.append({'m':m+1, 't':values})
 
         # calculate quantity cells balancing
         balancing_cells = 0
@@ -673,8 +660,8 @@ class Hub:
         errors_list = self.bitmask_to_strings(errors, BMS_ERRORS)    
         efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
 
-        avg_cell_voltage = round(sum(cell_voltages) / len(cell_voltages),2)
-        avg_cell_temp = round(sum(cell_temps) / len(cell_temps),1)
+        avg_cell_voltage = round(sum(all_cell_voltages) / len(all_cell_voltages),2)
+        avg_cell_temp = round(sum(all_cell_temps) / len(all_cell_temps),1)
 
         updated = datetime.now()
         self._last_update_bms = updated
@@ -701,10 +688,10 @@ class Hub:
         self.data[f'bms{bms_id}_errors'] = self.strings_to_string(errors_list)
 
         self.data[f'bms{bms_id}_cell_flags'] = cell_flags
-        self.data[f'bms{bms_id}_cell_voltages'] = cell_voltages_dict
+        self.data[f'bms{bms_id}_cell_voltages'] = cell_voltages
         self.data[f'bms{bms_id}_avg_c_v'] = avg_cell_voltage
 
-        self.data[f'bms{bms_id}_cell_temps'] = cell_temps_dict
+        self.data[f'bms{bms_id}_cell_temps'] = cell_temps
         self.data[f'bms{bms_id}_avg_c_t'] = avg_cell_temp
 
         self.data[f'bms{bms_id}_updated'] = updated

@@ -42,6 +42,8 @@ BMU_SENSOR_TYPES = {
     "errors": ["Errors", "errors", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "capacity": ["Total Capacity", "capacity", None, None, "kWh", None, EntityCategory.DIAGNOSTIC],
     "param_t_v": ["Param Table Version", "param_t_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "sensors_t": ["Temperature Sensors per Module", "sensors_t", None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "cells": ["Cells per Module", "cells", None, None, None, None, EntityCategory.DIAGNOSTIC],
 
     "soc": ["State of Charge", "soc", None, SensorStateClass.MEASUREMENT, "%", "mdi:battery", None],
     "soh": ["State of Health", "soh", None, SensorStateClass.MEASUREMENT, "%", "mdi:battery", None],
