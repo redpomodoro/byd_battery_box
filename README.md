@@ -48,22 +48,26 @@ To come!
 Voltages Table
 ```
 type: markdown
-content: >+
+style: |
+  ha-card {
+    width: 100%;
+  }
+content: >
   {% set modules =
-  state_attr('sensor.bms_1_cells_average_voltage','cell_voltages')%}
-  |Module|{% for i in range(1,17) %}Cell {{i}}|{%- endfor %}
+  state_attr('sensor.bms_1_cells_average_voltage','cell_voltages')%} | |{% for i
+  in range(1,17) %}Cell {{i}}|{%- endfor %}
 
   |:---|{% for i in range(1,17) %}---:|{% endfor %}
 
-  {% for m in modules %}{% set cells =  m['v'] %}|{{ m['m'] }}|{% for v in cells
-  %}{{ v }}|
+  {% for m in modules %}{% set cells =  m['v'] %}|Module {{ m['m'] }}|{% for v
+  in cells %}{{ v }}|
 
   {%- endfor %}
 
   {% endfor %}
-title: Module Voltages in V
+title: Module Voltages in mV
 grid_options:
-  columns: 24
+  columns: full
   rows: auto
 ```
 
@@ -74,19 +78,19 @@ content: >
   {% set modules =
   state_attr('sensor.bms_1_cells_average_temperature','cell_temps')%}
 
-  |Module|{% for i in range(1,9) %}Sensor {{i}}|{%- endfor %}
+  | |{% for i in range(1,9) %}Cell {{i*2-1}}-{{i*2}}|{%- endfor %}
 
   |:---|{% for i in range(1,9) %}---:|{% endfor %}
 
-  {% for m in modules %}{% set cells =  m['t'] %}|{{ m['m'] }}|{% for v in cells
-  %}{{ v }}|
+  {% for m in modules %}{% set cells =  m['t'] %}|Module {{ m['m'] }}|{% for v
+  in cells %}{{ v }}|
 
   {%- endfor %}
 
   {% endfor %}
 title: Module Temperatures in °C
 grid_options:
-  columns: 24
+  columns: full
   rows: auto
 ```
 
