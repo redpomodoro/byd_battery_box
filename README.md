@@ -13,8 +13,13 @@ Home assistant Custom Component for reading data from BYD Battery Box. This inte
 Copy contents of custom_components folder to your home-assistant config/custom_components folder or install through HACS.
 After reboot of Home-Assistant, this integration can be configured through the integration setup UI.
 
-> [!CAUTION]
+> [!IMPORTANT]
+> The battery must be connected by LAN cable as the wireless connection disables itself after a timeout. The default IP address of the BYD battery is 192.168.16.254. Later firmware versions seem to support DHCP and will use the assigned IP address. In the later case you will need to look up the address. Depending on your network configuration a static route might be added.  You can test connectivity to the battery in the browser by using the batteries address for example http://192.168.16.254 and should get a login page. 
+
+> [!IMPORTANT]
 > Note using other applications connecting to battery simulatousnely might give unexpected results. 
+
+
 
 # Usage
 
