@@ -137,7 +137,7 @@ class BydBoxSensor(SensorEntity):
     @property
     def extra_state_attributes(self):
         if 'balancing_qty' in self._key:
-            return {'cell_flags': self._hub.data.get(f'{self._key[:4]}_cell_flags')}
+            return {'cell_balancing': self._hub.data.get(f'{self._key[:4]}_cell_balancing')}
         elif 'avg_c_v' in self._key:
             return {'cell_voltages': self._hub.data.get(f'{self._key[:4]}_cell_voltages')}
         elif 'avg_c_t' in self._key:

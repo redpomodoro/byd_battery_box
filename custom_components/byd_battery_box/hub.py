@@ -388,18 +388,21 @@ class Hub:
         _LOGGER.error(f"unknown inverter. model: {model} inverter id: {id}")
         return "NA"
 
-    def bitmask_to_strings(self, bitmask, bitmaskList):
+    def bitmask_to_string(self, bitmask, bitmask_list, default='NA', max_length=255, bits=16):
         strings = []
-        for bit in range(16):
+        len_list = len(bitmask_list)
+        for bit in range(bits):
             if bitmask & (1<<bit):
-                strings.append(bitmaskList[bit])
-        return strings
-    
-    def strings_to_string(self, strings):
-        if len(strings):
-            return ','.join(strings)[255:]
-        return 'Normal'
+                if bit < len_list: 
+                    value = bitmask_list[bit]
+                else:
+                    value = f'bit {bit} undefined'
+                strings.append(value)
 
+        if len(strings):
+            return ','.join(strings)[:max_length]
+        return default
+    
     def read_info_data(self):
         """start reading info data"""
         regs = self.get_registers(address=0x0000, count=20)
@@ -528,7 +531,6 @@ class Hub:
         charge_lfte = self.convert_from_registers(regs[17:19], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.1
         discharge_lfte = self.convert_from_registers(regs[19:21], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.1
 
-        errors_list = self.bitmask_to_strings(errors, BMU_ERRORS)    
         param_t_v = f"{param_t_v1}.{param_t_v2}"
         efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
 
@@ -541,7 +543,7 @@ class Hub:
         self.data['max_cell_temp'] = max_cell_temp
         self.data['min_cell_temp'] = min_cell_temp
         self.data['bmu_temp'] = bmu_temp
-        self.data['errors'] = self.strings_to_string(errors_list)
+        self.data['errors'] =  self.bitmask_to_string(errors, BMU_ERRORS, 'Normal')    
         self.data['param_t_v'] = param_t_v
         self.data['output_voltage'] = output_voltage
         self.data['power'] = current * output_voltage
@@ -552,7 +554,6 @@ class Hub:
 
         return True
        
-
     async def read_bms_status_data(self, bms_id):
         """start reading status data"""
 
@@ -596,13 +597,17 @@ class Hub:
         max_temp = self._client.convert_from_registers(regs[4:5], data_type = self._client.DATATYPE.INT16)
         min_temp = self._client.convert_from_registers(regs[5:6], data_type = self._client.DATATYPE.INT16)
         max_temp_cell_module, min_temp_cell_module = self.convert_from_registers_int8(regs[6:7])
-        cell_flags = []
-        j = 1
-        for i in range(7,15):  
-            first, second = self.convert_from_registers_int8(regs[i:i+1])
-            cell_flags.append({'c':j, 'f': first})
-            cell_flags.append({'c':j+1, 'f': second})
-            j += 2
+
+        cell_balancing = []
+        balancing_cells = 0
+        for m in range(self._modules):
+            flags = self._client.convert_from_registers(regs[7+m:7+m+1], data_type = self._client.DATATYPE.UINT16)
+            bl = []
+            for bit in range(16):
+                b = flags & (1<<bit)
+                balancing_cells += b
+                bl.append(b)
+            cell_balancing.append({'m':m+1, 'b':bl})
 
         # TODO: change to use standard pymodbus function once HA has been upgraded to later version
         charge_lfte = self.convert_from_registers(regs[15:17], data_type = self._client.DATATYPE.UINT32, word_order='little') * 0.001
@@ -637,30 +642,28 @@ class Hub:
         if self._temps > 0:
             temp_parts = round(self._temps/2)
 
-        for m in range(0,self._modules):
+        for m in range(self._modules):
             values = []
-            for i in range(0,self._cells):
+            for i in range(self._cells):
                  voltage = self._client.convert_from_registers(regs_voltages[i+m*16:i+m*16+1], data_type = self._client.DATATYPE.INT16)
                  values.append(voltage)
             all_cell_voltages += values
             cell_voltages.append({'m':m+1, 'v':values})
             values = []
-            for i in range(0,temp_parts):
+            for i in range(temp_parts):
                 values += self.convert_from_registers_int8(regs_temps[i+m*4:i+m*4+1])
             all_cell_temps += values
             cell_temps.append({'m':m+1, 't':values})
 
         # calculate quantity cells balancing
-        balancing_cells = 0
-        for cell in cell_flags:
-           if cell['f'] & 1 == 1:
-              balancing_cells += 1
+        #balancing_cells = 0
+        #for cell in cell_flags:
+        #   if cell['f'] & 1 == 1:
+        #      balancing_cells += 1
 
-        warnings_list = self.bitmask_to_strings(warnings1, BMS_WARNINGS) + self.bitmask_to_strings(warnings2, BMS_WARNINGS) + self.bitmask_to_strings(warnings3, BMS_WARNINGS3)
-        errors_list = self.bitmask_to_strings(errors, BMS_ERRORS)    
         efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
 
-        avg_cell_voltage = round(sum(all_cell_voltages) / len(all_cell_voltages) / 1000, 3)
+        avg_cell_voltage = round(sum(all_cell_voltages) / len(all_cell_voltages),2)
         avg_cell_temp = round(sum(all_cell_temps) / len(all_cell_temps),1)
 
         updated = datetime.now()
@@ -674,7 +677,7 @@ class Hub:
         self.data[f'bms{bms_id}_min_c_t'] = min_temp
         self.data[f'bms{bms_id}_max_c_t_id'] = max_temp_cell_module
         self.data[f'bms{bms_id}_min_c_t_id'] = min_temp_cell_module
-        self.data[f'bms{bms_id}_balancing_qty']  = balancing_cells
+        self.data[f'bms{bms_id}_balancing_qty'] = balancing_cells
         self.data[f'bms{bms_id}_soc'] = soc
         self.data[f'bms{bms_id}_soh'] = soh
         self.data[f'bms{bms_id}_current'] = current
@@ -684,10 +687,10 @@ class Hub:
         self.data[f'bms{bms_id}_discharge_lfte'] = discharge_lfte
         self.data[f'bms{bms_id}_efficiency'] = efficiency
 
-        self.data[f'bms{bms_id}_warnings'] = self.strings_to_string(warnings_list)
-        self.data[f'bms{bms_id}_errors'] = self.strings_to_string(errors_list)
+        self.data[f'bms{bms_id}_warnings'] = self.bitmask_to_string(warnings1, BMS_WARNINGS, 'Normal') + self.bitmask_to_string(warnings2, BMS_WARNINGS, 'Normal') + self.bitmask_to_string(warnings3, BMS_WARNINGS3, 'Normal')
+        self.data[f'bms{bms_id}_errors'] = self.bitmask_to_string(errors, BMS_ERRORS, 'Normal')    
 
-        self.data[f'bms{bms_id}_cell_flags'] = cell_flags
+        self.data[f'bms{bms_id}_cell_balancing'] = cell_balancing
         self.data[f'bms{bms_id}_cell_voltages'] = cell_voltages
         self.data[f'bms{bms_id}_avg_c_v'] = avg_cell_voltage
 
