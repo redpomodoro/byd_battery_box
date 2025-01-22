@@ -48,7 +48,7 @@ To come!
 
 ### Markdown Cards
 
-![markdowncards](images/markdowncards3.png?raw=true "markdowncards")
+![cell_voltages](images/cell_voltages.png?raw=true "cell_voltages")
 
 Voltages Table
 ```
@@ -70,11 +70,12 @@ content: >
   {%- endfor %}
 
   {% endfor %}
-title: Module Voltages in mV
+title: Cell Voltages in mV
 grid_options:
   columns: full
   rows: auto
 ```
+![cell_temperatures](images/cell_temperatures.png?raw=true "cell_temperatures")
 
 Temperatures Table
 ```
@@ -93,7 +94,30 @@ content: >
   {%- endfor %}
 
   {% endfor %}
-title: Module Temperatures in °C
+title: Cell Temperatures in °C
+grid_options:
+  columns: full
+  rows: auto
+```
+
+![cell_balancing](images/cell_balancing.png?raw=true "cell_balancing")
+
+```
+type: markdown
+content: >
+  {% set modules =
+  state_attr('sensor.bms_1_cells_balancing','cell_balancing')%} |
+  |{% for i in range(1,17) %}Cell {{i}}|{%- endfor %}
+
+  |:---|{% for i in range(1,17) %}---:|{% endfor %}
+
+  {% for m in modules %}{% set cells =  m['b'] %}|Module {{ m['m']
+  }}|{% for b in cells %}{{ b }}|
+
+  {%- endfor %}
+
+  {% endfor %}
+title: Cell Temperatures in °C
 grid_options:
   columns: full
   rows: auto
