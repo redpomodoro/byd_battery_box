@@ -117,7 +117,7 @@ content: >
   {%- endfor %}
 
   {% endfor %}
-title: Cell Temperatures in °C
+title: Cell Balancing
 grid_options:
   columns: full
   rows: auto
