@@ -50,7 +50,7 @@ To come!
 
 ![cell_voltages](images/cell_voltages.png?raw=true "cell_voltages")
 
-Voltages Table
+Voltages Table in mV
 ```
       - type: grid
         cards:
@@ -84,6 +84,41 @@ Voltages Table
               rows: auto
         column_span: 2
 ```
+Voltages Table in V
+```
+      - type: grid
+        cards:
+          - type: markdown
+            style: |
+              ha-card {
+                width: 100%;
+              }
+            content: >
+              {% set
+              sensors=['sensor.bms_1_cells_average_voltage','sensor.bms_2_cells_average_voltage','sensor.bms_3_cells_average_voltage']%}
+              {% set cell_count = int(states('sensor.cells_per_module')) %}  {%
+              for u in range(1,int(states('sensor.towers'))+1)%} 
+
+              {% set modules = state_attr(sensors[u-1],'cell_voltages')%} | BMS
+              {{u}} |{% for i in range(1,cell_count+1)%}Cell {{i}}|{%- endfor %}
+
+              |:---|{% for i in range(1,cell_count+1) %}---:|{% endfor %}
+
+              {% for m in modules %}{% set cells =  m['v'] %}|Module {{ m['m']
+              }}|{% for v in cells %}{{ '%.3f' | format(v/1000) }}|
+
+              {%- endfor %}
+
+              {% endfor %}
+
+              {%- endfor %}
+            title: Cell Voltages in V
+            grid_options:
+              columns: full
+              rows: auto
+        column_span: 2
+```
+
 ![cell_temperatures](images/cell_temperatures.png?raw=true "cell_temperatures")
 
 Temperatures Table
