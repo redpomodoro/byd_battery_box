@@ -511,7 +511,7 @@ class BydBoxClient(ExtModbusClient):
 
         efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
 
-        avg_cell_voltage = round(sum(all_cell_voltages) / len(all_cell_voltages),2)
+        avg_cell_voltage = round(sum(all_cell_voltages) / len(all_cell_voltages) / 1000, 3)
         avg_cell_temp = round(sum(all_cell_temps) / len(all_cell_temps),1)
 
         warnings_list = self.bitmask_to_strings(warnings1, BMS_WARNINGS) + self.bitmask_to_strings(warnings2, BMS_WARNINGS) + self.bitmask_to_strings(warnings3, BMS_WARNINGS3)
