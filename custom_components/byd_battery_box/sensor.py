@@ -142,7 +142,13 @@ class BydBoxSensor(SensorEntity):
             return {'cell_voltages': self._hub.data.get(f'{self._key[:4]}_cell_voltages')}
         elif 'avg_c_t' in self._key:
             return {'cell_temps': self._hub.data.get(f'{self._key[:4]}_cell_temps')}
-        
+        elif 'bmu_last_log' in self._key:
+            return {'logs': self._hub.data.get('bmu_logs')}
+        elif 'b_total' in self._key:
+            return {'total_cells': self._hub.data.get(f'{self._key[:4]}_b_cells_total')}
+        # elif 'last_log' in self._key:
+        #     return {'logs': self._hub.data.get(f'{self._key[:4]}_logs')}
+
         return None
 
     @property
