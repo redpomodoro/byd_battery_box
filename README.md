@@ -50,77 +50,148 @@ To come!
 
 ![cell_voltages](images/cell_voltages.png?raw=true "cell_voltages")
 
-Voltages Table
+Voltages Table in mV
 ```
-type: markdown
-style: |
-  ha-card {
-    width: 100%;
-  }
-content: >
-  {% set modules =
-  state_attr('sensor.bms_1_cells_average_voltage','cell_voltages')%} | |{% for i
-  in range(1,17) %}Cell {{i}}|{%- endfor %}
+      - type: grid
+        cards:
+          - type: markdown
+            style: |
+              ha-card {
+                width: 100%;
+              }
+            content: >
+              {% set
+              sensors=['sensor.bms_1_cells_average_voltage','sensor.bms_2_cells_average_voltage','sensor.bms_3_cells_average_voltage']%}
+              {% set cell_count = int(states('sensor.cells_per_module')) %}  {%
+              for u in range(1,int(states('sensor.towers'))+1)%} 
 
-  |:---|{% for i in range(1,17) %}---:|{% endfor %}
+              {% set modules = state_attr(sensors[u-1],'cell_voltages')%} | BMS
+              {{u}} |{% for i in range(1,cell_count+1)%}Cell {{i}}|{%- endfor %}
 
-  {% for m in modules %}{% set cells =  m['v'] %}|Module {{ m['m'] }}|{% for v
-  in cells %}{{ v }}|
+              |:---|{% for i in range(1,cell_count+1) %}---:|{% endfor %}
 
-  {%- endfor %}
+              {% for m in modules %}{% set cells =  m['v'] %}|Module {{ m['m']
+              }}|{% for v in cells %}{{ v }}|
 
-  {% endfor %}
-title: Cell Voltages in mV
-grid_options:
-  columns: full
-  rows: auto
+              {%- endfor %}
+
+              {% endfor %}
+
+              {%- endfor %}
+            title: Cell Voltages in mV
+            grid_options:
+              columns: full
+              rows: auto
+        column_span: 2
 ```
+Voltages Table in V
+```
+      - type: grid
+        cards:
+          - type: markdown
+            style: |
+              ha-card {
+                width: 100%;
+              }
+            content: >
+              {% set
+              sensors=['sensor.bms_1_cells_average_voltage','sensor.bms_2_cells_average_voltage','sensor.bms_3_cells_average_voltage']%}
+              {% set cell_count = int(states('sensor.cells_per_module')) %}  {%
+              for u in range(1,int(states('sensor.towers'))+1)%} 
+
+              {% set modules = state_attr(sensors[u-1],'cell_voltages')%} | BMS
+              {{u}} |{% for i in range(1,cell_count+1)%}Cell {{i}}|{%- endfor %}
+
+              |:---|{% for i in range(1,cell_count+1) %}---:|{% endfor %}
+
+              {% for m in modules %}{% set cells =  m['v'] %}|Module {{ m['m']
+              }}|{% for v in cells %}{{ '%.3f' | format(v/1000) }}|
+
+              {%- endfor %}
+
+              {% endfor %}
+
+              {%- endfor %}
+            title: Cell Voltages in V
+            grid_options:
+              columns: full
+              rows: auto
+        column_span: 2
+```
+
 ![cell_temperatures](images/cell_temperatures.png?raw=true "cell_temperatures")
 
 Temperatures Table
 ```
-type: markdown
-content: >
-  {% set modules =
-  state_attr('sensor.bms_1_cells_average_temperature','cell_temps')%}
+      - type: grid
+        cards:
+          - type: markdown
+            style: |
+              ha-card {
+                width: 100%;
+              }
+            content: >
+              {% set
+              sensors=['sensor.bms_1_cells_average_temperature','sensor.bms_2_cells_average_temperature','sensor.bms_3_cells_average_temperature']%}
+              {% set cell_count = int(int(states('sensor.cells_per_module')) /
+              2) %}  {% for u in range(1,int(states('sensor.towers'))+1)%} 
 
-  | |{% for i in range(1,9) %}Cell {{i*2-1}}-{{i*2}}|{%- endfor %}
+              {% set modules = state_attr(sensors[u-1],'cell_temps')%} | BMS
+              {{u}} |{% for i in range(1,cell_count+1)%}Cell
+              {{i*2-1}}-{{i*2}}|{%- endfor %}
 
-  |:---|{% for i in range(1,9) %}---:|{% endfor %}
+              |:---|{% for i in range(1,cell_count+1) %}---:|{% endfor %}
 
-  {% for m in modules %}{% set cells =  m['t'] %}|Module {{ m['m'] }}|{% for v
-  in cells %}{{ v }}|
+              {% for m in modules %}{% set cells =  m['t'] %}|Module {{ m['m']
+              }}|{% for t in cells %}{{ t }}|
 
-  {%- endfor %}
+              {%- endfor %}
 
-  {% endfor %}
-title: Cell Temperatures in °C
-grid_options:
-  columns: full
-  rows: auto
+              {% endfor %}
+
+              {%- endfor %}              
+            title: Cell Temperatures in °C
+            grid_options:
+              columns: full
+              rows: auto
+        column_span: 2
 ```
 
 ![cell_balancing](images/cell_balancing.png?raw=true "cell_balancing")
 
 ```
-type: markdown
-content: >
-  {% set modules =
-  state_attr('sensor.bms_1_cells_balancing','cell_balancing')%} |
-  |{% for i in range(1,17) %}Cell {{i}}|{%- endfor %}
+      - type: grid
+        cards:
+          - type: markdown
+            style: |
+              ha-card {
+                width: 100%;
+              }
+            content: >
+              {% set
+              sensors=['sensor.bms_1_cells_balancing','sensor.bms_2_cells_balancing','sensor.bms_3_cells_balancing']%}
+              {% set cell_count = int(states('sensor.cells_per_module')) %}  {%
+              for u in range(1,int(states('sensor.towers'))+1)%} 
 
-  |:---|{% for i in range(1,17) %}---:|{% endfor %}
+              {% set modules = state_attr(sensors[u-1],'cell_balancing')%} | BMS
+              {{u}} |{% for i in range(1,cell_count+1)%}Cell {{i}}|{%- endfor %}
 
-  {% for m in modules %}{% set cells =  m['b'] %}|Module {{ m['m']
-  }}|{% for b in cells %}{{ b }}|
+              |:---|{% for i in range(1,cell_count+1) %}---:|{% endfor %}
 
-  {%- endfor %}
+              {% for m in modules %}{% set cells =  m['b'] %}|Module {{ m['m']
+              }}|{% for b in cells %}{% if b == 1%}yes{%else%}-{%endif%}|
 
-  {% endfor %}
-title: Cell Temperatures in °C
-grid_options:
-  columns: full
-  rows: auto
+              {%- endfor %}
+
+              {% endfor %}
+
+              {%- endfor %}
+            title: Cells Balancing
+            grid_options:
+              columns: full
+              rows: auto
+        column_span: 2
+
 ```
 
 
