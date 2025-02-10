@@ -9,19 +9,30 @@ Home assistant Custom Component for reading data from BYD Battery Box. This inte
 > This is an unofficial implementation and not supported by BYD. It might stop working at any point in time.
 > You are using this module (and it's prerequisites/dependencies) at your own risk. Not me neither any of contributors to this or any prerequired/dependency project are responsible for damage in any kind caused by this project or any of its prerequsites/dependencies.
 
-# Installation
-Copy contents of custom_components folder to your home-assistant config/custom_components folder or install through HACS.
-After reboot of Home-Assistant, this integration can be configured through the integration setup UI.
-
 > [!IMPORTANT]
 > The battery must be connected by LAN cable as the wireless connection disables itself after a timeout. The default IP address of the BYD battery is 192.168.16.254. Later firmware versions seem to support DHCP and will use the assigned IP address. In the later case you will need to look up the address. Depending on your network configuration a static route might be added.  You can test connectivity to the battery in the browser by using the batteries address for example http://192.168.16.254 and should get a login page. 
 
 > [!IMPORTANT]
 > Note using other applications connecting to battery simulatousnely might give unexpected results. 
 
+# Installation
+Copy contents of custom_components folder to your home-assistant config/custom_components folder or install through HACS.
+After reboot of Home-Assistant, this integration can be configured through the integration setup UI.
+
+#Data Updates
+The key BMU Status data will be refreshed 60 seconds. 
+
+Detailed BMS data will be refreshed by default every 10 minutes.
+
+The log data will be refresehd every 10 minutes. Note that on first load it will take several minutes to load log data.  
+
+
+
 
 
 # Usage
+
+
 
 ### Battery Management Unit
 
@@ -48,6 +59,33 @@ To come!
 
 ### Markdown Cards
 
+![log](images/log.png?raw=true "log")
+```
+      - type: grid
+        cards:
+          - type: markdown
+            style: |
+              ha-card {
+                width: 100%;
+              }
+            content: >
+              {% if states('sensor.log_count') | is_number %} {% set logs =
+              state_attr('sensor.last_log','logs')%} | Timestamp | Unit | Code |
+              Description | Details |
+
+              |:---|:---|---:|:---|:---|
+
+              {% for l in logs %} |{{ l['ts'] }}|{{ l['u'] }}|{{ l['c'] }}|{{
+              l['d'] }}|{{ l['detail'] }}|
+
+              {% endfor %} {% endif %}
+            title: Log
+            grid_options:
+              columns: full
+              rows: auto
+        column_span: 2
+```
+
 ![cell_voltages](images/cell_voltages.png?raw=true "cell_voltages")
 
 Voltages Table in mV
@@ -60,6 +98,7 @@ Voltages Table in mV
                 width: 100%;
               }
             content: >
+              {% if states('sensor.bms_1_cells_average_voltage') | is_number %}
               {% set
               sensors=['sensor.bms_1_cells_average_voltage','sensor.bms_2_cells_average_voltage','sensor.bms_3_cells_average_voltage']%}
               {% set cell_count = int(states('sensor.cells_per_module')) %}  {%
@@ -77,7 +116,7 @@ Voltages Table in mV
 
               {% endfor %}
 
-              {%- endfor %}
+              {%- endfor %} {% endif %}
             title: Cell Voltages in mV
             grid_options:
               columns: full
@@ -131,7 +170,8 @@ Temperatures Table
                 width: 100%;
               }
             content: >
-              {% set
+              {% if states('sensor.bms_1_cells_average_temperature') | is_number
+              %} {% set
               sensors=['sensor.bms_1_cells_average_temperature','sensor.bms_2_cells_average_temperature','sensor.bms_3_cells_average_temperature']%}
               {% set cell_count = int(int(states('sensor.cells_per_module')) /
               2) %}  {% for u in range(1,int(states('sensor.towers'))+1)%} 
@@ -149,8 +189,44 @@ Temperatures Table
 
               {% endfor %}
 
-              {%- endfor %}              
+              {%- endfor %}               {% endif %}
             title: Cell Temperatures in °C
+            grid_options:
+              columns: full
+              rows: auto
+        column_span: 2
+```
+
+![cell_balancing count](images/cell_balancing_count.png?raw=true "cell_balancing_count")
+
+```
+      - type: grid
+        cards:
+          - type: markdown
+            style: |
+              ha-card {
+                width: 100%;
+              }
+            content: >
+              {% if states('sensor.bms_1_balancing_total') | is_number %} {% set
+              sensors=['sensor.bms_1_balancing_total','sensor.bms_2_balancing_total','sensor.bms_3_balancing_total']%}
+              {% set cell_count = int(states('sensor.cells_per_module')) %}  {%
+              for u in range(1,int(states('sensor.towers'))+1)%} 
+
+              {% set modules = state_attr(sensors[u-1],'total_cells')%} | BMS
+              {{u}} |{% for i in range(1,cell_count+1)%}Cell {{i}}|{%- endfor %}
+
+              |:---|{% for i in range(1,cell_count+1) %}---:|{% endfor %}
+
+              {% for m in modules %}{% set cells =  m['bct'] %}|Module {{ m['m']
+              }}|{% for v in cells %}{{ v }}|
+
+              {%- endfor %}
+
+              {% endfor %}
+
+              {%- endfor %} {% endif %}
+            title: Cell Balancing Totals
             grid_options:
               columns: full
               rows: auto
@@ -168,7 +244,7 @@ Temperatures Table
                 width: 100%;
               }
             content: >
-              {% set
+              {% if states('sensor.bms_1_cells_balancing') | is_number %} {% set
               sensors=['sensor.bms_1_cells_balancing','sensor.bms_2_cells_balancing','sensor.bms_3_cells_balancing']%}
               {% set cell_count = int(states('sensor.cells_per_module')) %}  {%
               for u in range(1,int(states('sensor.towers'))+1)%} 
@@ -179,13 +255,13 @@ Temperatures Table
               |:---|{% for i in range(1,cell_count+1) %}---:|{% endfor %}
 
               {% for m in modules %}{% set cells =  m['b'] %}|Module {{ m['m']
-              }}|{% for b in cells %}{% if b == 1%}yes{%else%}-{%endif%}|
+              }}|{% for b in cells %}{% if b == 1%}on{%else%}-{%endif%}|
 
               {%- endfor %}
 
               {% endfor %}
 
-              {%- endfor %}
+              {%- endfor %} {% endif %}
             title: Cells Balancing
             grid_options:
               columns: full
