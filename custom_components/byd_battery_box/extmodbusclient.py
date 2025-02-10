@@ -6,12 +6,10 @@ import threading
 import logging
 import operator
 import threading
-#from datetime import timedelta, datetime
 from typing import Optional, Literal
 import struct
 import asyncio
 
-#from pymodbus.client import ModbusTcpClient
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.utilities import unpack_bitstring
 from pymodbus.exceptions import ModbusIOException

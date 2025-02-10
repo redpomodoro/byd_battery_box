@@ -120,8 +120,8 @@ class BydBoxClient(ExtModbusClient):
             self.logs = logs        
             self._update_balancing_cells_totals()
             _LOGGER.debug(f"logs entries loaded: {len(logs)}")  
-            #self.data['log_count'] = len(self.logs)    
 
+            #self.data['log_count'] = len(self.logs)    
             # last_log = logs[-1]
             # log = {'ts': ts.timestamp(), 'u': unit_id, 'c': code, 'data': hexdata}
             # last_log_id = self._get_unit_log_sensor_id(0)                
@@ -169,7 +169,6 @@ class BydBoxClient(ExtModbusClient):
 
         if result:
             self.data[f'bmu_logs'] = self.get_log_list(20)
-#            self.save_log_entries(append=True)
             self._update_balancing_cells_totals()
 
         self.busy = False 

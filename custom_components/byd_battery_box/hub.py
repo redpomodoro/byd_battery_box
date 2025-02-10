@@ -1,12 +1,11 @@
 """BYD Battery Box Hub."""
 from __future__ import annotations
 
-import threading
+import asyncio
 import logging
 import threading
 from datetime import timedelta, datetime
 from typing import Optional, Literal
-import asyncio
 from .bydboxclient import BydBoxClient
 
 from homeassistant.core import callback
@@ -37,7 +36,7 @@ class Hub:
         self._scan_interval = timedelta(seconds=scan_interval)
         self._scan_interval_bms = timedelta(seconds=scan_interval_bms)
         self._bydclient = BydBoxClient(host=host, port=port, unit_id=unit_id, timeout=max(3, (scan_interval - 1)))
-        #self.online = True     
+        self.online = True     
         self._busy = True
 
     @property 
@@ -95,40 +94,6 @@ class Hub:
         self._busy = False      
         return
 
-    # async def async_refresh_byd_box_data_new(self, _now: Optional[int] = None) -> dict:
-    #     _LOGGER.error(f"async_refresh_byd_box_data_new {self._bydclient.initialized}" )
-    #     """Time to update."""
-    #     # Skip if init isn't done yet
-    #     if self._bydclient.initialized == False:
-    #         return
-
-    #     """Time to update."""
-    #     if not self._entities:
-    #         return False
-
-    #     if not self._check_and_reconnect():
-    #         if not self._bydclient.connected:
-    #             _LOGGER.debug("Client not conenected skip update")
-    #             return False
-
-    #     try:
-    #         result = self._bydclient.update_bmu_status_data()
-    #     except Exception as e:
-    #         _LOGGER.exception("Error reading status data", exc_info=True)
-    #         result = False
-
-    #     if result == False:
-    #         return 
-    #     for update_callback in self._entities:
-    #         update_callback()
-
-    #     if self._last_full_update is None or ((datetime.now()-self._last_full_update) > self._scan_interval_bms):
-    #         await self._bydclient.read_all_bms_status_data()
-
-    #     if result:
-    #         for update_callback in self._entities:
-    #             update_callback()
-
     async def async_refresh_byd_box_data(self, _now: Optional[int] = None) -> dict:
         """Time to update."""
         if not self._bydclient.initialized:
@@ -136,8 +101,6 @@ class Hub:
         if self._busy:
             #_LOGGER.debug('Skipping update client busy')
             return
-
-        #result : bool = await self._hass.async_add_executor_job(self._refresh_byd_box_data)
 
         connected = await self._check_and_reconnect()
         if not connected:
@@ -150,8 +113,6 @@ class Hub:
         except Exception as e:
             _LOGGER.exception("Error reading status data", exc_info=True)
             return False
-
-
 
         if result == False:
             return 
@@ -174,24 +135,6 @@ class Hub:
                 if prev_len_logs != len(self._bydclient.logs):
                     result : bool = await self._hass.async_add_executor_job(self._bydclient.save_log_entries)
             self._busy = False
-
-    # def _refresh_byd_box_data(self, _now: Optional[int] = None) -> bool:
-    #     """Time to update."""
-    #     if not self._entities:
-    #         return False
-
-    #     if not self._check_and_reconnect():
-    #         if not self._bydclient.connected:
-    #             _LOGGER.debug("Client not conenected skip update")
-    #             return False
-
-    #     try:
-    #         result = self._bydclient.update_bmu_status_data()
-    #     except Exception as e:
-    #         _LOGGER.exception("Error reading status data", exc_info=True)
-    #         result = False
-
-    #     return result
 
     async def test_connection(self) -> bool:
         """Test connectivity"""
