@@ -244,7 +244,7 @@ Temperatures Table
                 width: 100%;
               }
             content: >
-              {% set
+              {% if states('sensor.bms_1_cells_balancing') | is_number %} {% set
               sensors=['sensor.bms_1_cells_balancing','sensor.bms_2_cells_balancing','sensor.bms_3_cells_balancing']%}
               {% set cell_count = int(states('sensor.cells_per_module')) %}  {%
               for u in range(1,int(states('sensor.towers'))+1)%} 
@@ -255,13 +255,13 @@ Temperatures Table
               |:---|{% for i in range(1,cell_count+1) %}---:|{% endfor %}
 
               {% for m in modules %}{% set cells =  m['b'] %}|Module {{ m['m']
-              }}|{% for b in cells %}{% if b == 1%}yes{%else%}-{%endif%}|
+              }}|{% for b in cells %}{% if b == 1%}on{%else%}-{%endif%}|
 
               {%- endfor %}
 
               {% endfor %}
 
-              {%- endfor %}
+              {%- endfor %} {% endif %}
             title: Cells Balancing
             grid_options:
               columns: full
