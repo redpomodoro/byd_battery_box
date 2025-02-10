@@ -132,7 +132,7 @@ class BydBoxClient(ExtModbusClient):
 
     async def update_all_bms_status_data(self):
         if self.busy:
-            _LOGGER.error(f"update_bms_status_data already busy", exc_info=True) 
+            _LOGGER.debug(f"update_bms_status_data already busy", exc_info=True) 
             return
         self.busy = True 
         for bms_id in range(1, self._bms_qty + 1):
@@ -149,7 +149,7 @@ class BydBoxClient(ExtModbusClient):
 
     async def update_all_log_data(self):
         if self.busy:
-            _LOGGER.error(f"update_all_log_data already busy", exc_info=True) 
+            _LOGGER.debug(f"update_all_log_data already busy", exc_info=True) 
             return
         self.busy = True 
 
