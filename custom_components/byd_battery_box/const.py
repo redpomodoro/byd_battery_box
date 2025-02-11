@@ -72,7 +72,7 @@ BMS_SENSOR_TYPES = {
     "warnings": ["Warnings", "warnings",None, None, None, None, EntityCategory.DIAGNOSTIC],
     "errors": ["Errors", "errors",None, None, None, None, EntityCategory.DIAGNOSTIC],
     "avg_c_v": ["Cells average voltage", "avg_c_v", SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
-    "avg_c_t": ["Cells average temperature", "avg_c_t", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "V", "mdi:lightning-bolt", None],
+    "avg_c_t": ["Cells average temperature", "avg_c_t", SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, "°C", "mdi:lightning-bolt", None],
     "updated": ["Updated", "updated",SensorDeviceClass.TIMESTAMP, None, None, None, EntityCategory.DIAGNOSTIC],
     "last_log": ["Last log", "last_log",None, None, None, None, EntityCategory.DIAGNOSTIC],
     "b_total": ["Balancing total", "b_total",None, None, None, None, None],
