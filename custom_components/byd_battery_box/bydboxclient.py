@@ -60,11 +60,11 @@ class BydBoxClient(ExtModbusClient):
 
         self.data = {}
         self.data['unit_id'] = unit_id
-        self.logs = {}
+        self.log = {}
 
-        self._log_csv_path = './custom_components/byd_battery_box/logs/byd_logs.csv'
-        self._log_txt_path = './custom_components/byd_battery_box/logs/byd.log'
-        self._log_json_path = './custom_components/byd_battery_box/logs/byd_logs.json'
+        self._log_csv_path = './custom_components/byd_battery_box/log/byd_logs.csv'
+        self._log_txt_path = './custom_components/byd_battery_box/log/byd.log'
+        self._log_json_path = './custom_components/byd_battery_box/log/byd_logs.json'
 
     async def init_data(self, close = False, read_status_data = False):
         result = False
@@ -115,13 +115,13 @@ class BydBoxClient(ExtModbusClient):
             except Exception as e:
                 _LOGGER.debug(f"Failed loading json log file {e}")   
                 return False       
-            self.save_log_txt_file(logs, append=False)
+            #self.save_log_txt_file(logs, append=False)
             self.save_log_csv_file(logs)
-            self.logs = logs        
+            self.log = logs        
             self._update_balancing_cells_totals()
             _LOGGER.debug(f"logs entries loaded: {len(logs)}")  
 
-            #self.data['log_count'] = len(self.logs)    
+            #self.data['log_count'] = len(self.log)    
             # last_log = logs[-1]
             # log = {'ts': ts.timestamp(), 'u': unit_id, 'c': code, 'data': hexdata}
             # last_log_id = self._get_unit_log_sensor_id(0)                
@@ -155,7 +155,7 @@ class BydBoxClient(ExtModbusClient):
 
         result = False
         self._new_logs = {}
-        if len(self.logs) == 0:
+        if len(self.log) == 0:
             log_depth = 7
         else:
             log_depth = 1
@@ -177,12 +177,12 @@ class BydBoxClient(ExtModbusClient):
 
     def _update_balancing_cells_totals(self):
         try:
-            if len(self.logs) == 0:
+            if len(self.log) == 0:
                 # skip until logs are available
                 return
             balancing_total = [0,0,0]
             b_cells_total = {}
-            for k, log in self.logs.items():
+            for k, log in self.log.items():
                 if log['c'] == 17:
                     ts = datetime.fromtimestamp(log['ts'])
                     decoded = self.decode_bms_log_data(ts, 17, bytearray.fromhex(log['data']))
@@ -616,19 +616,19 @@ class BydBoxClient(ExtModbusClient):
 
             k = f'{ts.strftime("%Y%m%d %H:%M:%S")}-{unit_id}-{code}' 
 
-            if not k in self.logs.keys():
+            if not k in self.log.keys():
                 hexdata = binascii.hexlify(data).decode('ascii')
                 log = {'ts': ts.timestamp(), 'u': unit_id, 'c': code, 'data': hexdata}
                 self._new_logs[k] = log
-                self.logs[k] = log
-                #_LOGGER.debug(f'New log {k} {len(self.logs)}')
+                self.log[k] = log
+                #_LOGGER.debug(f'New log {k} {len(self.log)}')
 
             if i==0:
                 last_log_id = self._get_unit_log_sensor_id(unit_id)                
                 code_desc = self._get_log_code_desc(unit_id, code)
                 self.data[last_log_id] = f'{ts.strftime("%m/%d/%Y, %H:%M:%S")} {code} {code_desc}'
 
-        self.data['log_count'] = len(self.logs)        
+        self.data['log_count'] = len(self.log)        
 
         return True
 
@@ -657,11 +657,11 @@ class BydBoxClient(ExtModbusClient):
         # if append:
         #     self.save_log_txt_file(self._new_logs, append=True)
         # else:
-        #     self.save_log_txt_file(self.logs)
-        self.save_log_csv_file(self.logs)
-        self.save_log_json_file(self.logs)
+        #     self.save_log_txt_file(self.log)
+        self.save_log_csv_file(self.log)
+        self.save_log_json_file(self.log)
 
-        _LOGGER.debug(f'Saved {len(self._new_logs)} new log entries. Total: {len(self.logs)}')
+        _LOGGER.debug(f'Saved {len(self._new_logs)} new log entries. Total: {len(self.log)}')
         return True
 
     def save_log_json_file(self, logs):
@@ -707,7 +707,7 @@ class BydBoxClient(ExtModbusClient):
         return unit_id, unit_name, ts, code, data 
 
     def get_log_list(self, max_length):
-        logs = sorted(self.logs.items(), reverse=True)
+        logs = sorted(self.log.items(), reverse=True)
         i = 0
         log_list = []
         for k, log in logs:
