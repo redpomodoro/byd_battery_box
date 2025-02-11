@@ -88,7 +88,7 @@ class Hub:
             self.close()
 
     async def init_data(self, close = False, read_status_data = False):
-        result = await self._hass.async_add_executor_job(self._bydclient.update_logs_from_file)  
+        result = await self._hass.async_add_executor_job(self._bydclient.update_log_from_file)  
         self._busy = True      
         result = await self._bydclient.init_data(close = close, read_status_data=read_status_data)
         self._busy = False      
@@ -127,12 +127,12 @@ class Hub:
                 for update_callback in self._entities:
                     update_callback()
 
-            prev_len_logs = len(self._bydclient.logs)
+            prev_len_log = len(self._bydclient.log)
             result = await self._bydclient.update_all_log_data()
             if result:
                 for update_callback in self._entities:
                     update_callback()
-                if prev_len_logs != len(self._bydclient.logs):
+                if prev_len_log != len(self._bydclient.log):
                     result : bool = await self._hass.async_add_executor_job(self._bydclient.save_log_entries)
             self._busy = False
 

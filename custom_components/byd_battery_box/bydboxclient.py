@@ -107,7 +107,7 @@ class BydBoxClient(ExtModbusClient):
 
         return True
 
-    def update_logs_from_file(self) -> bool:
+    def update_log_from_file(self) -> bool:
 
         if not os.path.exists(self._log_path):
             os.mkdir(self._log_path)
@@ -118,15 +118,15 @@ class BydBoxClient(ExtModbusClient):
             try:
                 with open(self._log_json_path, 'r') as openfile:
                     # Reading from json file
-                    logs = json.load(openfile)
+                    log = json.load(openfile)
             except Exception as e:
                 _LOGGER.debug(f"Failed loading json log file {e}")   
                 return False       
-            #self.save_log_txt_file(logs, append=False)
-            self.save_log_csv_file(logs)
-            self.log = logs        
+            #self.save_log_txt_file(log, append=False)
+            self.save_log_csv_file(log)
+            self.log = log        
             self._update_balancing_cells_totals()
-            _LOGGER.debug(f"logs entries loaded: {len(logs)}")  
+            _LOGGER.debug(f"log entries loaded: {len(log)}")  
 
             #self.data['log_count'] = len(self.log)    
             # last_log = logs[-1]
