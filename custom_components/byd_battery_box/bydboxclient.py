@@ -63,9 +63,9 @@ class BydBoxClient(ExtModbusClient):
         self.log = {}
 
         self._log_path = './custom_components/byd_battery_box/log/'
-        self._log_csv_path = self._log_path + 'byd_logs.csv'
+        self._log_csv_path = self._log_path + 'byd_log.csv'
         self._log_txt_path = self._log_path + 'byd.log'
-        self._log_json_path = self._log_path + 'byd_logs.json'
+        self._log_json_path = self._log_path + 'byd_log.json'
 
     async def init_data(self, close = False, read_status_data = False):
         result = False
@@ -549,7 +549,7 @@ class BydBoxClient(ExtModbusClient):
         self.data[f'bms{bms_id}_errors'] = self.bitmask_to_string(errors, BMS_ERRORS, 'Normal')    
         self.data[f'bms{bms_id}_cell_balancing'] = cell_balancing
         self.data[f'bms{bms_id}_cell_voltages'] = cell_voltages
-        self.data[f'bms{bms_id}_avg_c_v'] = avg_cell_voltage
+        self.data[f'bms{bms_id}_avg_c_v'] = round(avg_cell_voltage * 0.001, 3)
 
         self.data[f'bms{bms_id}_cell_temps'] = cell_temps
         self.data[f'bms{bms_id}_avg_c_t'] = avg_cell_temp
