@@ -62,9 +62,10 @@ class BydBoxClient(ExtModbusClient):
         self.data['unit_id'] = unit_id
         self.log = {}
 
-        self._log_csv_path = './custom_components/byd_battery_box/log/byd_logs.csv'
-        self._log_txt_path = './custom_components/byd_battery_box/log/byd.log'
-        self._log_json_path = './custom_components/byd_battery_box/log/byd_logs.json'
+        self._log_path = './custom_components/byd_battery_box/log/'
+        self._log_csv_path = self._log_path + 'byd_logs.csv'
+        self._log_txt_path = self._log_path + 'byd.log'
+        self._log_json_path = self._log_path + 'byd_logs.json'
 
     async def init_data(self, close = False, read_status_data = False):
         result = False
@@ -107,6 +108,12 @@ class BydBoxClient(ExtModbusClient):
         return True
 
     def update_logs_from_file(self) -> bool:
+
+        if not os.path.exists(self._log_path):
+            os.mkdir(self._log_path)
+            _LOGGER.warning(f"log did not exist, created new log folder: {self._log_path}")  
+            return False
+
         if os.path.isfile(self._log_json_path):
             try:
                 with open(self._log_json_path, 'r') as openfile:
@@ -127,8 +134,9 @@ class BydBoxClient(ExtModbusClient):
             # last_log_id = self._get_unit_log_sensor_id(0)                
             # code_desc = self._get_log_code_desc(unit_id, code)
             # self.data[last_log_id] = f'{ts.strftime("%m/%d/%Y, %H:%M:%S")} {code} {code_desc}'
-
-        return True
+            return True
+        
+        return False
 
     async def update_all_bms_status_data(self):
         if self.busy:
