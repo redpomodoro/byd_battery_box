@@ -67,52 +67,54 @@ class BydBoxClient(ExtModbusClient):
         self._log_txt_path = self._log_path + 'byd.log'
         self._log_json_path = self._log_path + 'byd_log.json'
 
+    def toggle_busy(func):
+        async def wrapper(self, *args, **kwargs):
+            if self.busy:
+                #_LOGGER.debug(f"client already busy {func.__name__}", exc_info=True) 
+                return
+            #_LOGGER.debug(f"Busy client on {func.__name__}")
+            self.busy = True
+            result = await func(self, *args, **kwargs)
+            self.busy = False
+            #_LOGGER.debug(f"Busy client off {func.__name__}")
+            return result
+        return wrapper
+
+    @toggle_busy
     async def init_data(self, close = False, read_status_data = False):
-        result = False
-
-        await self.connect()
-        try: 
-            retries = 0
-            result = await self.update_info_data()
-            while result==False and retries<4:
-                await asyncio.sleep(.1)
-                result = await self.update_info_data()
-                retries += 1
-        except Exception as e:
-            _LOGGER.error(f"Error reading base info {self._host}:{self._port} unit id: {self._unit_id}", exc_info=True)
-            raise Exception(f"Error reading base info unit id: {self._unit_id}")
-
-        if result == False:
-            _LOGGER.error(f"Error reading info {self._host}:{self._port} unit id: {self._unit_id}")
+        if not self.connected: await self.connect() 
 
         try:
-            result = await self.update_ext_info_data()
+            await self.update_info_data()
         except Exception as e:
-            _LOGGER.error(f"Error reading ext info data", exc_info=True)
+            raise Exception(f"Error reading base info unit id: {self._unit_id}")
+
+        try:
+            await self.update_ext_info_data()
+        except Exception as e:
             raise Exception(f"Error reading ext info unit id: {self._unit_id}")
 
         if read_status_data:
             try:
-                result = await self.update_bmu_status_data()
+                await self.update_bmu_status_data()
             except Exception as e:
                 _LOGGER.error(f"Error reading status data", exc_info=True)
+            await self.update_all_bms_status_data()
 
-            result = await self.update_all_bms_status_data()
-
-        if close:
-            self.close()
+        if close: self.close()
         self.initialized = True
-
         _LOGGER.debug(f"init done. data: {self.data}")          
-
         return True
 
     def update_log_from_file(self) -> bool:
-
         if not os.path.exists(self._log_path):
-            os.mkdir(self._log_path)
-            _LOGGER.warning(f"log did not exist, created new log folder: {self._log_path}")  
-            return False
+            try:
+                os.mkdir(self._log_path)
+                _LOGGER.warning(f"log did not exist, created new log folder: {self._log_path}")  
+                return False
+            except Exception as e:
+                _LOGGER.error(f'Failed to create log folder {self._log_path}')
+                return False
 
         if os.path.isfile(self._log_json_path):
             try:
@@ -138,29 +140,18 @@ class BydBoxClient(ExtModbusClient):
         
         return False
 
+    @toggle_busy
     async def update_all_bms_status_data(self):
-        if self.busy:
-            _LOGGER.debug(f"update_bms_status_data already busy", exc_info=True) 
-            return
-        self.busy = True 
         for bms_id in range(1, self._bms_qty + 1):
             try:
-                result = await self.update_bms_status_data(bms_id)
+                await self.update_bms_status_data(bms_id)
             except Exception as e:
-                self.busy = False 
                 _LOGGER.error(f"Error reading bms status data {bms_id}", exc_info=True)
                 return
-
-        self.busy = False 
-   
         return True   
 
+    @toggle_busy
     async def update_all_log_data(self):
-        if self.busy:
-            _LOGGER.debug(f"update_all_log_data already busy", exc_info=True) 
-            return
-        self.busy = True 
-
         result = False
         self._new_logs = {}
         if len(self.log) == 0:
@@ -178,10 +169,7 @@ class BydBoxClient(ExtModbusClient):
         if result:
             self.data[f'bmu_logs'] = self.get_log_list(20)
             self._update_balancing_cells_totals()
-
-        self.busy = False 
-   
-        return True   
+        return result
 
     def _update_balancing_cells_totals(self):
         try:
@@ -352,15 +340,11 @@ class BydBoxClient(ExtModbusClient):
 
         return True
 
+    @toggle_busy
     async def update_bmu_status_data(self):
         """start reading bmu status data"""
-        if self.busy:
-            _LOGGER.error(f"read_all_bms_status_data already busy", exc_info=True) 
-            return
-        self.busy = True 
         regs = await self.get_registers(address=0x0500, count=21) # 1280
         if regs is None:
-            self.busy = False 
             return False
 
         soc = self._client.convert_from_registers(regs[0:1], data_type = self._client.DATATYPE.UINT16)
@@ -402,12 +386,9 @@ class BydBoxClient(ExtModbusClient):
         self.data['efficiency'] = efficiency
         self.data[f'updated'] = datetime.now()
 
-        self.busy = False 
-
         return True
        
     async def update_bms_status_data(self, bms_id):
-        #_LOGGER.debug(f"update_bms_status_data {bms_id}")
         """start reading status data"""
 
         await self._client.write_registers(0x0550, [bms_id,0x8100], slave=self._unit_id)

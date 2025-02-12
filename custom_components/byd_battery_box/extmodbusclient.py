@@ -2,7 +2,7 @@
 
 """Extended Modbus Class"""
 
-import threading
+#import threading
 import logging
 import operator
 import threading
@@ -20,7 +20,7 @@ class ExtModbusClient:
 
     def __init__(self, host: str, port: int, unit_id: int, timeout: int, framer:str) -> None:
         """Init Class"""
-        self._lock = threading.Lock()
+        #self._lock = threading.Lock()
         self._host = host
         self._port = port
         self._unit_id = unit_id
@@ -33,21 +33,26 @@ class ExtModbusClient:
 
     def close(self):
         """Disconnect client."""
-        with self._lock:
-            self._client.close()
+        # with self._lock:
+        #     self._client.close()
 
     async def connect(self):
         """Connect client."""
         result = False
-        with self._lock:
+        #with self._lock:
+        retries = 0
+        while not result and retries < 4: 
+            if retries > 0:
+                _LOGGER.warning(f"Retry attempt: {retries} connecting to: {self._host}:{self._port} unit id: {self._unit_id}")
+                await asyncio.sleep(.2)
             result = await self._client.connect()
-
+            retries += 1
+        if not self.connected:
+            raise Exception(f"Failed connection to {self._host}:{self._port} unit id: {self._unit_id} retried {retries-1}")
         if result:
-            _LOGGER.info("successfully connected to %s:%s",
-                            self._client.comm_params.host, self._client.comm_params.port)
+            _LOGGER.debug("successfully connected to %s:%s", self._client.comm_params.host, self._client.comm_params.port)
         else:
-            _LOGGER.warning("not able to connect to %s:%s",
-                            self._client.comm_params.host, self._client.comm_params.port)
+            _LOGGER.debug("not able to connect to %s:%s", self._client.comm_params.host, self._client.comm_params.port)
         return result
 
     @property
@@ -70,10 +75,10 @@ class ExtModbusClient:
     async def read_holding_registers(self, unit_id, address, count):
         """Read holding registers."""
         _LOGGER.debug(f"read registers a: {address} s: {unit_id} c {count} {self._client.connected}")
-        with self._lock:
-            return await self._client.read_holding_registers(
-                address=address, count=count, slave=unit_id
-            )
+        #with self._lock:
+        return await self._client.read_holding_registers(
+            address=address, count=count, slave=unit_id
+        )
 
     async def get_registers(self, address, count, retries = 0):
         data = await self.read_holding_registers( unit_id=self._unit_id, address=address, count=count)
@@ -92,10 +97,10 @@ class ExtModbusClient:
     async def write_registers(self, unit_id, address, payload):
         """Write registers."""
         _LOGGER.info(f"write registers a: {address} p: {payload}")
-        with self._lock:
-            return await self._client.write_registers(
-                address=address, values=payload, slave=unit_id
-            )
+        #with self._lock:
+        return await self._client.write_registers(
+            address=address, values=payload, slave=unit_id
+        )
 
     def calculate_value(self, value, sf, digits=2):
         return round(value * 10**sf, digits)
