@@ -92,7 +92,7 @@ class Hub:
     def toggle_busy(func):
         async def wrapper(self, *args, **kwargs):
             if self._busy:
-                #_LOGGER.debug(f"hub already busy {func.__name__}") 
+                _LOGGER.debug(f"hub already busy {func.__name__}") 
                 return
             self._busy = True
             result = await func(self, *args, **kwargs)
@@ -129,22 +129,27 @@ class Hub:
             return True
 
         try:
+            _LOGGER.debug(f"updating BMU status")
             result = await self._bydclient.update_bmu_status_data()
         except Exception as e:
-            _LOGGER.error("Error reading status data")
+            _LOGGER.error(f"Error reading status data {e}", exc_info=True)
             return False
         
         if result == False:
+            _LOGGER.warning(f"bms status data not updated")
             return 
         self.update_entities()
 
         if ((datetime.now()-self._last_full_update) > self._scan_interval_bms):
+            _LOGGER.debug(f"updating BMS status")
             result = await self._bydclient.update_all_bms_status_data()
             if result:
                 self._last_full_update = datetime.now()
                 self.update_entities()
 
-            if ((datetime.now()-self._last_log_update).total_seconds() > 60):
+        if ((datetime.now()-self._last_log_update) > self._scan_interval_bms):
+#            if ((datetime.now()-self._last_log_update).total_seconds() > 60):
+                _LOGGER.debug(f"updating log")
                 prev_len_log = len(self._bydclient.log)
                 result = await self._bydclient.update_all_log_data()
                 self._last_log_update = datetime.now()
@@ -160,15 +165,19 @@ class Hub:
     def close(self):
         """Disconnect client."""
         self._bydclient.close()
+        _LOGGER.debug(f"close hub")
 
-    async def connect(self):
-        """Connect client."""
-        return await self._bydclient.connect()
-
+    # async def connect(self):
+    #     """Connect client."""
+    #     result = await self._bydclient.connect()
+    #     _LOGGER.debug(f"connect {result}")
+    #     return
+    
     async def test_connection(self) -> bool:
         """Test connectivity"""
+        _LOGGER.debug(f"test connection")
         try:
-            return await self.connect()
+            return await self._bydclient.connect()
         except Exception as e:
             _LOGGER.exception("Error connecting to the device")
             return False

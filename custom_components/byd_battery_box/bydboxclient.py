@@ -100,7 +100,7 @@ class BydBoxClient(ExtModbusClient):
         if not os.path.exists(self._log_path):
             try:
                 os.mkdir(self._log_path)
-                _LOGGER.warning(f"log did not exist, created new log folder: {self._log_path}")  
+                _LOGGER.warning(f"Log folder did not exist, created new log folder: {self._log_path}")  
                 return False
             except Exception as e:
                 _LOGGER.error(f'Failed to create log folder {self._log_path}')
@@ -120,7 +120,7 @@ class BydBoxClient(ExtModbusClient):
             self.data[f'log'] = self.get_log_list(20)
             self._update_balancing_cells_totals()
             self.save_log_csv_file()
-            _LOGGER.debug(f"log entries loaded: {len(log)}")  
+            _LOGGER.debug(f"{len(log)} log entries loaded from file")  
 
             #TODO update last_log per unit
             # last_log = logs[-1]
@@ -374,6 +374,8 @@ class BydBoxClient(ExtModbusClient):
         self.data['discharge_lfte'] = discharge_lfte
         self.data['efficiency'] = efficiency
         self.data[f'updated'] = datetime.now()
+
+        _LOGGER.debug(f'bmu {output_voltage}V {current}A {current * output_voltage}W')
 
         return True
        
