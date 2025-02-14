@@ -69,13 +69,13 @@ To come!
                 width: 100%;
               }
             content: >
-              {% if states('sensor.log_count') | is_number %} {% set logs =
-              state_attr('sensor.last_log','logs')%} | Timestamp | Unit | Code |
+              {% if states('sensor.log_entries') | is_number %} {% set log =
+              state_attr('sensor.log_entries','log')%} | Timestamp | Unit | Code |
               Description | Details |
 
               |:---|:---|---:|:---|:---|
 
-              {% for l in logs %} |{{ l['ts'] }}|{{ l['u'] }}|{{ l['c'] }}|{{
+              {% for l in log %} |{{ l['ts'] }}|{{ l['u'] }}|{{ l['c'] }}|{{
               l['d'] }}|{{ l['detail'] }}|
 
               {% endfor %} {% endif %}

@@ -43,10 +43,10 @@ from .bydbox_const import (
 _LOGGER = logging.getLogger(__name__)
 
 class BydBoxClient(ExtModbusClient):
-    """Hub for BYD Battery Box Interface"""
+    """Async Modbus Client for BYD Battery Box"""
 
     def __init__(self, host: str, port: int, unit_id: int, timeout: int) -> None:
-        """Init hub."""
+        """Init Class"""
         super(BydBoxClient, self).__init__(host = host, port = port, unit_id=unit_id, timeout=timeout, framer='rtu')
 
         self.initialized = False
@@ -70,18 +70,15 @@ class BydBoxClient(ExtModbusClient):
     def toggle_busy(func):
         async def wrapper(self, *args, **kwargs):
             if self.busy:
-                #_LOGGER.debug(f"client already busy {func.__name__}", exc_info=True) 
                 return
-            #_LOGGER.debug(f"Busy client on {func.__name__}")
             self.busy = True
             result = await func(self, *args, **kwargs)
             self.busy = False
-            #_LOGGER.debug(f"Busy client off {func.__name__}")
             return result
         return wrapper
 
     @toggle_busy
-    async def init_data(self, close = False, read_status_data = False):
+    async def init_data(self, close = False) -> bool:
         if not self.connected: await self.connect() 
 
         try:
@@ -94,16 +91,9 @@ class BydBoxClient(ExtModbusClient):
         except Exception as e:
             raise Exception(f"Error reading ext info unit id: {self._unit_id}")
 
-        if read_status_data:
-            try:
-                await self.update_bmu_status_data()
-            except Exception as e:
-                _LOGGER.error(f"Error reading status data", exc_info=True)
-            await self.update_all_bms_status_data()
-
-        if close: self.close()
         self.initialized = True
-        _LOGGER.debug(f"init done. data: {self.data}")          
+        if close: self.close()
+        _LOGGER.debug(f"init done.")          
         return True
 
     def update_log_from_file(self) -> bool:
@@ -125,12 +115,14 @@ class BydBoxClient(ExtModbusClient):
                 _LOGGER.debug(f"Failed loading json log file {e}")   
                 return False       
             #self.save_log_txt_file(log, append=False)
-            self.save_log_csv_file(log)
             self.log = log        
+            self.data['log_entries'] = len(self.log)    
+            self.data[f'log'] = self.get_log_list(20)
             self._update_balancing_cells_totals()
+            self.save_log_csv_file()
             _LOGGER.debug(f"log entries loaded: {len(log)}")  
 
-            #self.data['log_count'] = len(self.log)    
+            #TODO update last_log per unit
             # last_log = logs[-1]
             # log = {'ts': ts.timestamp(), 'u': unit_id, 'c': code, 'data': hexdata}
             # last_log_id = self._get_unit_log_sensor_id(0)                
@@ -141,37 +133,34 @@ class BydBoxClient(ExtModbusClient):
         return False
 
     @toggle_busy
-    async def update_all_bms_status_data(self):
+    async def update_all_bms_status_data(self) -> bool:
         for bms_id in range(1, self._bms_qty + 1):
             try:
                 await self.update_bms_status_data(bms_id)
             except Exception as e:
-                _LOGGER.error(f"Error reading bms status data {bms_id}", exc_info=True)
+                _LOGGER.error(f"Error reading BMS status data {bms_id}", exc_info=True)
                 return
         return True   
 
     @toggle_busy
-    async def update_all_log_data(self):
+    async def update_all_log_data(self) -> bool:
         result = False
         self._new_logs = {}
-        if len(self.log) == 0:
-            log_depth = 7
-        else:
-            log_depth = 1
         try:
             for unit_id in range(self._bms_qty + 1):
                 if unit_id > 0:
                     await asyncio.sleep(.2)
-                result = await self.update_log_data(unit_id, log_depth=log_depth)
+                result = await self.update_log_data(unit_id)
         except Exception as e:
             _LOGGER.error(f"Error reading log data {unit_id}", exc_info=True)
 
         if result:
-            self.data[f'bmu_logs'] = self.get_log_list(20)
+            self.data[f'log'] = self.get_log_list(20)
             self._update_balancing_cells_totals()
+            self.data['log_entries'] = len(self.log)    
         return result
 
-    def _update_balancing_cells_totals(self):
+    def _update_balancing_cells_totals(self) -> None:
         try:
             if len(self.log) == 0:
                 # skip until logs are available
@@ -210,7 +199,7 @@ class BydBoxClient(ExtModbusClient):
         #_LOGGER.debug(f'balancing {balancing_total[1]} {self._b_cells_total.get(1)}')
         #_LOGGER.debug(f'balancing {balancing_total[2]} {self._b_cells_total.get(2)}')
         
-    def _get_balancings_totals_per_module(self, t):
+    def _get_balancings_totals_per_module(self, t) -> list:
         r = []
         for m in range(self._modules):
             mct = []
@@ -222,7 +211,7 @@ class BydBoxClient(ExtModbusClient):
             r.append({'m': m, 'bct':mct})
         return r
 
-    def _get_inverter_model(self,model,id):
+    def _get_inverter_model(self,model,id) -> str:
         inverter = None
         if model == "LVS":                     
           inverter = LVS_INVERTER_LIST.get(id)
@@ -236,7 +225,7 @@ class BydBoxClient(ExtModbusClient):
             _LOGGER.error(f"unknown inverter. model: {model} inverter id: {id}")
         return inverter
     
-    async def update_info_data(self):
+    async def update_info_data(self) -> bool:
         """start reading info data"""
         regs = await self.get_registers(address=0x0000, count=20)
         if regs is None:
@@ -291,7 +280,7 @@ class BydBoxClient(ExtModbusClient):
 
         return True
 
-    async def update_ext_info_data(self):
+    async def update_ext_info_data(self) -> bool:
         """start reading info data"""
         regs = await self.get_registers(address=0x0010, count=2)
         if regs is None:
@@ -341,7 +330,7 @@ class BydBoxClient(ExtModbusClient):
         return True
 
     @toggle_busy
-    async def update_bmu_status_data(self):
+    async def update_bmu_status_data(self) -> bool:
         """start reading bmu status data"""
         regs = await self.get_registers(address=0x0500, count=21) # 1280
         if regs is None:
@@ -388,10 +377,10 @@ class BydBoxClient(ExtModbusClient):
 
         return True
        
-    async def update_bms_status_data(self, bms_id):
+    async def update_bms_status_data(self, bms_id) -> bool:
         """start reading status data"""
 
-        await self._client.write_registers(0x0550, [bms_id,0x8100], slave=self._unit_id)
+        await self.write_registers(unit_id=self._unit_id, address=0x0550, payload=[bms_id,0x8100])
         timeout = 5
         i = 0
         response_reg = 0
@@ -409,23 +398,23 @@ class BydBoxClient(ExtModbusClient):
             return False
 
         regs = []
-        for i in range(0,4):
+        for i in range(4):
             await asyncio.sleep(.05)
             new_regs = await self.get_registers(address=0x0558, count=65)
             if new_regs is None:
-                _LOGGER.error(f"failed reading bms status part: {i}", exc_info=True)
+                _LOGGER.error(f"Failed reading BMS status part {i}", exc_info=True)
                 return False
             else:
                 regs += new_regs
 
         if not len(regs) == 260:
-            _LOGGER.error(f"unexpected number of bms status regs: {len(regs)}")
+            _LOGGER.error(f"unexpected number of BMS status regs: {len(regs)}")
             return False
 
         # skip 1st register with length
         max_voltage = round(self._client.convert_from_registers(regs[1:2], data_type = self._client.DATATYPE.INT16) * 0.001,3)
         if max_voltage > 5:
-            _LOGGER.error(f"bms {bms_id} unexpected max voltage {max_voltage}", exc_info=True)
+            _LOGGER.error(f"BMS {bms_id} unexpected max voltage {max_voltage}", exc_info=True)
             return False
         min_voltage = round(self._client.convert_from_registers(regs[2:3], data_type = self._client.DATATYPE.INT16) * 0.001,3)
         max_voltage_cell_module, min_voltage_cell_module = self.convert_from_registers_int8(regs[3:4])
@@ -498,9 +487,9 @@ class BydBoxClient(ExtModbusClient):
         #   if cell['f'] & 1 == 1:
         #      balancing_cells += 1
 
-        efficiency = round((discharge_lfte / charge_lfte) * 100.0,1)
+        efficiency = round((discharge_lfte / charge_lfte) * 100.0, 1)
 
-        avg_cell_voltage = round(sum(all_cell_voltages) / len(all_cell_voltages),2)
+        avg_cell_voltage = round(sum(all_cell_voltages) / len(all_cell_voltages) * 0.001, 3)
         avg_cell_temp = round(sum(all_cell_temps) / len(all_cell_temps),1)
 
         warnings_list = self.bitmask_to_strings(warnings1, BMS_WARNINGS) + self.bitmask_to_strings(warnings2, BMS_WARNINGS) + self.bitmask_to_strings(warnings3, BMS_WARNINGS3)
@@ -530,7 +519,7 @@ class BydBoxClient(ExtModbusClient):
         self.data[f'bms{bms_id}_errors'] = self.bitmask_to_string(errors, BMS_ERRORS, 'Normal')    
         self.data[f'bms{bms_id}_cell_balancing'] = cell_balancing
         self.data[f'bms{bms_id}_cell_voltages'] = cell_voltages
-        self.data[f'bms{bms_id}_avg_c_v'] = round(avg_cell_voltage * 0.001, 3)
+        self.data[f'bms{bms_id}_avg_c_v'] = avg_cell_voltage
 
         self.data[f'bms{bms_id}_cell_temps'] = cell_temps
         self.data[f'bms{bms_id}_avg_c_t'] = avg_cell_temp
@@ -539,19 +528,28 @@ class BydBoxClient(ExtModbusClient):
 
         return True
     
-    async def update_log_data(self, unit_id, log_depth = 1):
-        prev = len(self._new_logs)
+    async def update_log_data(self, unit_id, log_depth = 1) -> bool:
+        entries = 0
+        if log_depth == 1: 
+            update_last = True 
+        else: 
+            update_last = False
+        
         for i in range(log_depth):
-            await self._read_log_data_unit(unit_id)
-            if (len(self._new_logs) - prev) < 20:
-                #_LOGGER.debug(f'no new logs found {unit_id} {i} {log_depth} {len(self._new_logs)}')
-                break
-            prev = len(self._new_logs)
+            new = await self._read_log_data_unit(unit_id, update_last=update_last)
+            if new is None: new = 0
+            entries += new
+            if log_depth > 1:
+                if new < 20:
+                    break
+                _LOGGER.warning(f'...updating {self._get_unit_name(unit_id)} log {entries} entries.')
+        if log_depth > 1:                
+            _LOGGER.warning(f'Finished updating {self._get_unit_name(unit_id)} log; found {entries} log entries.')
         return True
    
-    async def _read_log_data_unit(self, unit_id):
+    async def _read_log_data_unit(self, unit_id, update_last = True) -> int:
         """start reading log data"""
-        await self._client.write_registers(0x05a0, [unit_id,0x8100], slave=self._unit_id)
+        await self.write_registers(unit_id=self._unit_id, address=0x05a0, payload=[unit_id,0x8100])
         timeout = 5
         i = 0
         response_reg = 0
@@ -566,22 +564,24 @@ class BydBoxClient(ExtModbusClient):
                 response_reg = data.registers[0]
         if response_reg == 0:
             _LOGGER.error(f"read log data error timeout.", exc_info=True)
-            return False
+            return None
 
         regs = []
         for i in range(5):
             await asyncio.sleep(.05)
             new_regs = await self.get_registers(address=0x05A8, count=65)
             if new_regs is None:
-                _LOGGER.error(f"failed reading {self._get_unit_name(unit_id)} log part: {i}", exc_info=True)
-                return
+                _LOGGER.error(f"Failed reading {self._get_unit_name(unit_id)} log part: {i}", exc_info=True)
+                return None
             else:
                 regs += new_regs[1:] # skip first byte 
 
         if len(regs) == 0 or not len(regs) == 320:
-            _LOGGER.error(f"unexpected number of {self._get_unit_name(unit_id)}  log regs: {len(regs)}")
-            return False    
-
+            _LOGGER.error(f"Unexpected number of {self._get_unit_name(unit_id)}  log regs: {len(regs)}")
+            return None    
+        
+        entries = 0
+        ts:datetime = None
         for i in range(0,20):
             sub_regs=regs[i*15:i*15+15]
 
@@ -595,98 +595,113 @@ class BydBoxClient(ExtModbusClient):
             month, day = self.convert_from_registers_int8(sub_regs[1:2])                 
             hour, minute = self.convert_from_registers_int8(sub_regs[2:3])              
             second, dummy = self.convert_from_registers_int8(sub_regs[3:4])
-            ts:datetime = None
+
+            if year == 0 and month == 0 and day == 0 and code == 0:
+                _LOGGER.debug(f'Reached end: {i} {year}-{month}-{day} {hour}:{minute}:{second} code: {code}')
+                break 
+            if year in [255]:
+                _LOGGER.error(f'Invalid year in log entry: {i} {year}-{month}-{day} {hour}:{minute}:{second} code: {code}')
+                break 
+
+            if month in [0,13]:
+                _LOGGER.warning(f'Invalid month in log entry: {i} {year}-{month}-{day} {hour}:{minute}:{second} code: {code}')
+                month = 1
+            if day == 0:
+                _LOGGER.warning(f'Invalid day in log entry: {i} {year}-{month}-{day} {hour}:{minute}:{second} code: {code}')
+                day = 1
+
             try:
                 year += 2000                 
                 ts:datetime = datetime(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
             except Exception as e:
-                _LOGGER.error(f'Failed to derive log timestamp {e}')
-                return
-
-            k = f'{ts.strftime("%Y%m%d %H:%M:%S")}-{unit_id}-{code}' 
+                _LOGGER.error(f'Failed to derive log timestamp entry: {i} {year}-{month}-{day} {hour}:{minute}:{second} code: {code} exception: {e}')
+                break
+            
+            k = f'{ts.strftime("%Y%m%d %H:%M:%S")}-{code}-{unit_id}' 
+            entries += 1
+            #_LOGGER.debug(f'log {i} {k}')
 
             if not k in self.log.keys():
                 hexdata = binascii.hexlify(data).decode('ascii')
-                log = {'ts': ts.timestamp(), 'u': unit_id, 'c': code, 'data': hexdata}
-                self._new_logs[k] = log
-                self.log[k] = log
-                #_LOGGER.debug(f'New log {k} {len(self.log)}')
+                entry = {'ts': ts.timestamp(), 'u': unit_id, 'c': code, 'data': hexdata}
+                self._new_logs[k] = entry
+                self.log[k] = entry
 
-            if i==0:
+            if update_last and i==0:
                 last_log_id = self._get_unit_log_sensor_id(unit_id)                
                 code_desc = self._get_log_code_desc(unit_id, code)
                 self.data[last_log_id] = f'{ts.strftime("%m/%d/%Y, %H:%M:%S")} {code} {code_desc}'
 
         self.data['log_count'] = len(self.log)        
 
-        return True
+        return entries
 
-    def _get_unit_log_sensor_id(self, unit_id):    
+    def _get_unit_log_sensor_id(self, unit_id) -> str:    
         if unit_id == 0:
             last_log_id = 'bmu_last_log'      
         else:
             last_log_id = f'bms{unit_id}_last_log' 
         return last_log_id    
 
-    def _get_unit_name(self, unit_id):    
+    def _get_unit_name(self, unit_id) -> str:    
         if unit_id == 0:
             unit = 'BMU'
         else:
             unit = f'BMS {unit_id}'
         return unit    
 
-    def _get_log_code_desc(self, unit_id, code):
+    def _get_log_code_desc(self, unit_id, code)  -> str:
         if unit_id == 0:
             code_desc = self.get_value_from_dict(BMU_LOG_CODES, code, 'Not available')
         else:
             code_desc = self.get_value_from_dict(BMS_LOG_CODES, code, 'Not available')
         return code_desc
 
-    def save_log_entries(self, append=True):
+    def save_log_entries(self, append=True) -> None:
         # if append:
         #     self.save_log_txt_file(self._new_logs, append=True)
         # else:
         #     self.save_log_txt_file(self.log)
-        self.save_log_csv_file(self.log)
-        self.save_log_json_file(self.log)
+        self.log = dict(sorted(self.log.items()))
+        self.save_log_csv_file()
+        self.save_log_json_file()
 
         _LOGGER.debug(f'Saved {len(self._new_logs)} new log entries. Total: {len(self.log)}')
         return True
 
-    def save_log_json_file(self, logs):
-        logs = dict(sorted(logs.items()))
+    def save_log_json_file(self) -> None:
+        #log_s = dict(sorted(log.items()))
         with open(self._log_json_path, "w") as outfile:
-            json.dump(logs, outfile, indent=1, sort_keys=True, default=str)
+            json.dump(self.log, outfile, indent=1, sort_keys=False, default=str)
 
-    def save_log_txt_file(self, logs, append=True):
-        logs = dict(sorted(logs.items()))
+    def save_log_txt_file(self, log:dict, append=True) -> None:
+        l#og_s = dict(sorted(log.items()))
         if append:
             write_type = 'a'
         else:
             write_type = 'w'
         with open(self._log_txt_path, write_type) as myfile:
-            for k, log in logs.items():
-                unit_id, unit_name, ts, code, data  = self.split_log_entry(log)
+            for k, entry in self.log.items():
+                unit_id, unit_name, ts, code, data  = self.split_log_entry(entry)
                 code_desc, decoded = self.decode_log_data(unit_id, ts, code, data)
                 detail = decoded['desc']
                 line = f'{ts.strftime("%Y%m%d %H:%M:%S")} {unit_name} {code} {code_desc} {detail}\n' 
                 myfile.write(line)
 
-    def save_log_csv_file(self, logs):
-        logs = dict(sorted(logs.items()))
-
+    def save_log_csv_file(self) -> None:
+        #log_s = dict(sorted(log.items()))
         with open(self._log_csv_path, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['ts', 'unit','code','description','detail','data'])
             
-            for k, log in logs.items():
-                unit_id, unit_name, ts, code, data  = self.split_log_entry(log)
+            for k, entry in self.log.items():
+                unit_id, unit_name, ts, code, data  = self.split_log_entry(entry)
                 code_desc, decoded = self.decode_log_data(unit_id, ts, code, data)
                 detail = decoded['desc']
                 log_list = [ts.strftime("%Y%m%d %H:%M:%S"), unit_name, code, code_desc, detail, binascii.hexlify(data).decode('ascii')]
                 writer.writerow(log_list)
 
-    def split_log_entry(self, log):
+    def split_log_entry(self, log:dict):
         unit_id = int(log['u'])
         unit_name = self._get_unit_name(unit_id)
         code = int(log['c'])
@@ -695,19 +710,15 @@ class BydBoxClient(ExtModbusClient):
 
         return unit_id, unit_name, ts, code, data 
 
-    def get_log_list(self, max_length):
+    def get_log_list(self, max_length) -> list:
         logs = sorted(self.log.items(), reverse=True)
-        i = 0
         log_list = []
-        for k, log in logs:
+        for k, log in logs[:max_length]:
             unit_id, unit_name, ts, code, data = self.split_log_entry(log)
             code_desc, decoded = self.decode_log_data(unit_id, ts, code, data)
             detail = decoded.get('desc')
             hexdata = log['data']
             decoded.pop('desc')
-            i += 1
-            if i>max_length:
-                break
             log_list.append({'ts': ts, 'u': unit_name, 'c': code, 'd': code_desc, 'data': decoded, 'detail': detail, 'data': hexdata})
 
         return log_list
@@ -728,7 +739,7 @@ class BydBoxClient(ExtModbusClient):
 
         return code_desc, decoded
 
-    def decode_bmu_log_data(self, ts:datetime, code:int, data:bytearray):
+    def decode_bmu_log_data(self, ts:datetime, code:int, data:bytearray) -> dict:
         datapoints = {}
 
         if code == 0:
@@ -845,7 +856,8 @@ class BydBoxClient(ExtModbusClient):
         elif code == 105:
             if (data[0] == 0) or (data[0] == 1) or (data[0] == 2):
                # BMU Parameters table update
-                datapoints['pt_u'] = ''
+                #datapoints['pt_u'] = ''
+                pass
             else:
                 # ?
                 pass
@@ -869,7 +881,7 @@ class BydBoxClient(ExtModbusClient):
  
         return datapoints
 
-    def decode_bms_log_data(self, ts:datetime, code:int, data:bytearray):
+    def decode_bms_log_data(self, ts:datetime, code:int, data:bytearray) -> dict:
         datapoints = {}
 
         if code == 0:
@@ -892,7 +904,7 @@ class BydBoxClient(ExtModbusClient):
                 datapoints['section'] = data[2]
 
             datapoints['firmware_v']  = f"{data[3]:d}" + "." + f"{data[4]:d}"
-        elif code in [2,3,4,5,6,7,9,10,13,14,16,19,20,21]:            
+        elif code in [2,3,4,5,6,7,9,10,11,13,14,16,19,20,21]:            
             warnings1 = int(data[1] * 0x100 + data[0])
             warnings2 = int(data[3] * 0x100 + data[2])
             warnings3 = int(data[5] * 0x100 + data[4])
@@ -957,7 +969,8 @@ class BydBoxClient(ExtModbusClient):
         elif code == 105:
             x = self.convert_from_byte_uint16(data, 0, type='LE')
             y = self.convert_from_byte_uint16(data, 2, type='LE')
-            datapoints['threshold']  = f"{x:d}" + "." + f"{y:d}"
+#            datapoints['threshold']  = f"{x:d}" + "." + f"{y:d}"
+            datapoints['pt_v']  = f"{x:d}" + "." + f"{y:d}"
         elif code == 106:
             datapoints['sn_change'] = 1
         elif code == 111:
@@ -970,7 +983,7 @@ class BydBoxClient(ExtModbusClient):
 
         return datapoints
 
-    def log_data_to_str(self, data):
+    def log_data_to_str(self, data) -> str:
         strings = []
         for dp, v in data.items():
             dp_config = DATA_POINTS.get(dp)
@@ -996,5 +1009,3 @@ class BydBoxClient(ExtModbusClient):
             else:
                 _LOGGER.error(f'Datapoint {dp} not defined')
         return f"{'. '.join(strings)}."
-
-

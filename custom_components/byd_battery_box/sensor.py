@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from homeassistant.components.sensor import (
     SensorEntity,
 )
-from homeassistant.const import CONF_NAME #, CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.icon import icon_for_battery_level
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -31,7 +31,7 @@ async def async_setup_entry(
 ) -> None:
     """Add sensors for passed config_entry in HA."""
     hub:Hub = config_entry.runtime_data
-    hub_name = config_entry.data[CONF_NAME]
+#    hub_name = config_entry.data[CONF_NAME]
 
     entities = []
 
@@ -142,12 +142,10 @@ class BydBoxSensor(SensorEntity):
             return {'cell_voltages': self._hub.data.get(f'{self._key[:4]}_cell_voltages')}
         elif 'avg_c_t' in self._key:
             return {'cell_temps': self._hub.data.get(f'{self._key[:4]}_cell_temps')}
-        elif 'bmu_last_log' in self._key:
-            return {'logs': self._hub.data.get('bmu_logs')}
+        elif 'log_entries' in self._key:
+            return {'log': self._hub.data.get('log')}
         elif 'b_total' in self._key:
             return {'total_cells': self._hub.data.get(f'{self._key[:4]}_b_cells_total')}
-        # elif 'last_log' in self._key:
-        #     return {'logs': self._hub.data.get(f'{self._key[:4]}_logs')}
 
         return None
 

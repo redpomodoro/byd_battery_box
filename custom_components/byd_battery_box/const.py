@@ -16,6 +16,20 @@ ATTR_MANUFACTURER = "BYD"
 DEFAULT_BMS_SCAN_INTERVAL = 600
 CONF_BMS_SCAN_INTERVAL = "bms_scan_interval"
 
+DEVICE_TYPES = {
+    0: "BMU",
+    1: "BMS 1",
+    2: "BMS 2",
+    3: "BMS 3",    
+}
+
+BMU_BUTTON_TYPES = {
+    "update_log_history_100": ["Update last 100 log entries", "update_log_history_100", None, None, None, None, None],
+    "update_log_history_500": ["Update last 500 log entries", "update_log_history_500", None, None, None, None, None],
+    "update_log_history_1000": ["Update last 1000 log entries", "update_log_history_1000", None, None, None, None, None],
+    "update_log_history_2000": ["Update last 2000 log entries", "update_log_history_2000", None, None, None, None, None],
+}
+
 BMU_SENSOR_TYPES = {
     "inverter": ["Inverter", "inverter", None, None, None, None, EntityCategory.DIAGNOSTIC],
     "bmu_v": ["BMU version", "bmu_v", None, None, None, None, EntityCategory.DIAGNOSTIC],
@@ -47,8 +61,8 @@ BMU_SENSOR_TYPES = {
     "discharge_lfte": ["Discharge total energy", "discharge_lfte", SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, "kWh", None, None],
     "efficiency": ["Efficiency", "efficiency",None, None, "%", None, None],
     "updated": ["Updated", "updated",SensorDeviceClass.TIMESTAMP, None, None, None, EntityCategory.DIAGNOSTIC],
-    "bmu_last_log": ["Last log", "bmu_last_log",None, None, None, None, EntityCategory.DIAGNOSTIC],
-    "log_count": ["Log count", "log_count",None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "bmu_last_log": ["BMU last log", "bmu_last_log",None, None, None, None, EntityCategory.DIAGNOSTIC],
+    "log_entries": ["Log entries", "log_entries",None, None, None, None, EntityCategory.DIAGNOSTIC],
 }
 
 BMS_SENSOR_TYPES = {

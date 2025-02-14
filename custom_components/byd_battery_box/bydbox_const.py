@@ -34,80 +34,80 @@ MODULE_TYPE = {
     2: "HVS"
 }
 
-BMU_ERRORS = [
-    "High temperature charging (cells)",
-    "Low temperature charging (cells)",
-    "Discharging overcurrent(cells)",
-    "Charging overcurrent(cells)",
-    "Main circuit failure",
-    "Short circuit",
-    "Cell imbalance",
-    "Current sensor error",
-    "Battery overvoltage",
-    "Battery undervoltage",
-    "Cell overvoltage",
-    "Cell undervoltage",
-    "Voltage sensor failure",
-    "Temperature sensor failure",
-    "High temperature discharging (cells)",
-    "Low temperature discharging (cells)",
-]
+BMU_ERRORS = {
+    0: "High temperature charging (cells)",
+    1: "Low temperature charging (cells)",
+    2: "Discharging overcurrent(cells)",
+    3: "Charging overcurrent(cells)",
+    4: "Main circuit failure",
+    5: "Short circuit",
+    6: "Cell imbalance",
+    7: "Current sensor error",
+    8: "Battery overvoltage",
+    9: "Battery undervoltage",
+    10: "Cell overvoltage",
+    11: "Cell undervoltage",
+    12: "Voltage sensor failure",
+    13: "Temperature sensor failure",
+    14: "High temperature discharging (cells)",
+    15: "Low temperature discharging (cells)",
+}
 
-BMS_ERRORS = [
-    "Cells voltage sensor failure", 
-    "Temperature sensor failure",   
-    "BIC communication failure",       
-    "Pack voltage sensor failure",   
-    "Current sensor failure",
-    "Charging MOS failure",
-    "Discharging MOS failure",
-    "Precharging MOS failure",
-    "Main relay failure", 
-    "Precharging Failed",
-    "Heating device failure",
-    "Radiator failure",
-    "BIC balance failure",
-    "Cells failure",
-    "PCB temperature sensor failure", 
-    "Functional safety failure"
-]
-BMS_WARNINGS = [
-    "Battery overvoltage",
-    "Battery undervoltage",
-    "Cells overvoltage",
-    "Cells undervoltage", 
-    "Cells imbalance",
-    "Charging high temperature (cells)",
-    "Charging low temperature (cells)",
-    "Discharging high temperature (cells)",
-    "Discharging low temperature (cells)",
-    "Charging overcurrent (cells)",
-    "Discharging overcurrent (cells)",
-    "Charging overcurrent (hardware)",
-    "Short circuit",
-    "Inverse connection",
-    "Interlock switch abnormal",
-    "Air switch abnormal"
-]
+BMS_ERRORS = {
+    0: "Cells voltage sensor failure", 
+    1: "Temperature sensor failure",   
+    2: "BIC communication failure",       
+    3: "Pack voltage sensor failure",   
+    4: "Current sensor failure",
+    5: "Charging MOS failure",
+    6: "Discharging MOS failure",
+    7: "Precharging MOS failure",
+    8: "Main relay failure", 
+    9: "Precharging Failed",
+    10: "Heating device failure",
+    11: "Radiator failure",
+    12: "BIC balance failure",
+    13: "Cells failure",
+    14: "PCB temperature sensor failure", 
+    15: "Functional safety failure"
+}
+BMS_WARNINGS = {
+    0: "Battery overvoltage",
+    1: "Battery undervoltage",
+    2: "Cells overvoltage",
+    3: "Cells undervoltage", 
+    4: "Cells imbalance",
+    5: "Charging high temperature (cells)",
+    6: "Charging low temperature (cells)",
+    7: "Discharging high temperature (cells)",
+    8: "Discharging low temperature (cells)",
+    9: "Charging overcurrent (cells)",
+    10: "Discharging overcurrent (cells)",
+    11: "Charging overcurrent (hardware)",
+    12: "Short circuit",
+    13: "Inverse connection",
+    14: "Interlock switch abnormal",
+    15: "Air switch abnormal"
+}
 
-BMS_WARNINGS3 = [ 
-    "Battery overvoltage",
-    "Battery undervoltage",
-    "Cell overvoltage",
-    "Cell undervoltage",
-    "Voltage sensor failure",
-    "Temperature sensor failure",
-    "High temperature discharging (cells)",
-    "Low temperature discharging (cells)",
-    "High temperature charging (cells)",
-    "Low temperature charging (cells)",
-    "Overcurrent discharging",
-    "Overcurrent charging",
-    "Main circuit failure",
-    "Short circuit alarm",
-    "Cells imbalance",
-    "Current sensor failure" 
-]
+BMS_WARNINGS3 = { 
+    0: "Battery overvoltage",
+    1: "Battery undervoltage",
+    2: "Cell overvoltage",
+    3: "Cell undervoltage",
+    4: "Voltage sensor failure",
+    5: "Temperature sensor failure",
+    6: "High temperature discharging (cells)",
+    7: "Low temperature discharging (cells)",
+    8: "High temperature charging (cells)",
+    9: "Low temperature charging (cells)",
+    10: "Overcurrent discharging",
+    11: "Overcurrent charging",
+    12: "Main circuit failure",
+    13: "Short circuit alarm",
+    14: "Cells imbalance",
+    15: "Current sensor failure" 
+}
 
 BMU_LOG_WARNINGS = {
     2: "Cells overvoltage", 
@@ -139,8 +139,8 @@ BMU_LOG_ERRORS = {
 }
 
 BMU_LOG_CODES = { 
-	0:"Power ON", 
-	1:"Power OFF", 
+	0:"Powered ON", 
+	1:"Powered OFF", 
 	2:"Events record", 
 
     22: "Firmware update started",                  
@@ -163,8 +163,8 @@ BMU_LOG_CODES = {
     40:"BMS firmware list",                   
     41:"MCU list of BMS",                    
 
-	101:"Firmware start to update", 
-	102:"Firmware update successful", 
+	101:"Firmware update started", 
+	102:"Firmware update finished", 
 	103:"Firmware update failure", 
 	104:"Firmware jump into other section", 
 	105:"Parameters table updated", 
@@ -205,11 +205,11 @@ BMS_LOG_CODES = {
     20:"System functional safety fault", 
     21:"Events additional info", 
 
-    101:"Start firmware update", 
-    102:"Firmware update finish", 
+    101:"Firmware update started", 
+    102:"Firmware update finished", 
     103:"Firmware update failed", 
     104:"Firmware jump into other section", 
-    105:"Parameters table update", 
+    105:"Parameters table updated", 
     106:"SN code changed", 
     107:"Current calibration", 
     108:"Battery voltage calibration", 
@@ -320,9 +320,9 @@ DATA_POINTS = {
     'firmware_v2': {'label':'Firmware v2', 'type':'n', 'unit':''},
     'firmware_n3': {'label':'Firmware n3', 'type':'n', 'unit':''},
     'firmware_v3': {'label':'Firmware v3', 'type':'n', 'unit':''},
-    'pt_u': {'label':'Parameter table update', 'type':'n', 'unit':''},
-    'pt_v': {'label':'Parameter table v', 'type':'n', 'unit':''},
-    'dt_cal': {'label':'Datatime calibration by {v}', 'type':'s', 'unit':''},
+#    'pt_u': {'label':'Parameter table update', 'type':'n', 'unit':''},
+    'pt_v': {'label':'Parameter table updated to v {v}', 'type':'s', 'unit':''},
+    'dt_cal': {'label':'Datetime calibration by {v}', 'type':'s', 'unit':''},
     'bms_updt': {'label':'BMS update', 'type':'n', 'unit':''},
     'firmware_v': {'label':'Firmware', 'type':'n', 'unit':''},
     'mcu': {'label':'MCU', 'type':'n', 'unit':''},

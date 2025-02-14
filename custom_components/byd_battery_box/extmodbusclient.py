@@ -2,7 +2,6 @@
 
 """Extended Modbus Class"""
 
-#import threading
 import logging
 import operator
 import threading
@@ -13,6 +12,7 @@ import asyncio
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.utilities import unpack_bitstring
 from pymodbus.exceptions import ModbusIOException
+from pymodbus import ExceptionResponse
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,7 +20,6 @@ class ExtModbusClient:
 
     def __init__(self, host: str, port: int, unit_id: int, timeout: int, framer:str) -> None:
         """Init Class"""
-        #self._lock = threading.Lock()
         self._host = host
         self._port = port
         self._unit_id = unit_id
@@ -33,13 +32,12 @@ class ExtModbusClient:
 
     def close(self):
         """Disconnect client."""
-        # with self._lock:
-        #     self._client.close()
+        self._client.close()
 
     async def connect(self):
         """Connect client."""
+        #_LOGGER.debug("Modbus connect")
         result = False
-        #with self._lock:
         retries = 0
         while not result and retries < 4: 
             if retries > 0:
@@ -47,7 +45,7 @@ class ExtModbusClient:
                 await asyncio.sleep(.2)
             result = await self._client.connect()
             retries += 1
-        if not self.connected:
+        if not self._client.connected:
             raise Exception(f"Failed connection to {self._host}:{self._port} unit id: {self._unit_id} retried {retries-1}")
         if result:
             _LOGGER.debug("successfully connected to %s:%s", self._client.comm_params.host, self._client.comm_params.port)
@@ -55,6 +53,15 @@ class ExtModbusClient:
             _LOGGER.debug("not able to connect to %s:%s", self._client.comm_params.host, self._client.comm_params.port)
         return result
 
+    async def _check_and_reconnect(self):
+        #_LOGGER.debug(f"Connection status {self._client.connected}")
+        if not self._client.connected:
+            #_LOGGER.debug("Modbus client is not connected, trying to reconnect")
+            await self.connect()
+        if not self._client.connected:
+            raise Exception(f'Lost connection')
+        return self._client.connected
+    
     @property
     def connected(self) -> bool:
         return self._client.connected
@@ -74,8 +81,8 @@ class ExtModbusClient:
 
     async def read_holding_registers(self, unit_id, address, count):
         """Read holding registers."""
-        _LOGGER.debug(f"read registers a: {address} s: {unit_id} c {count} {self._client.connected}")
-        #with self._lock:
+        #_LOGGER.debug(f"read registers a: {address} s: {unit_id} c {count} {self._client.connected}")
+        await self._check_and_reconnect()
         return await self._client.read_holding_registers(
             address=address, count=count, slave=unit_id
         )
@@ -83,21 +90,21 @@ class ExtModbusClient:
     async def get_registers(self, address, count, retries = 0):
         data = await self.read_holding_registers( unit_id=self._unit_id, address=address, count=count)
         if data.isError():
-            if isinstance(data,ModbusIOException):
+            if isinstance(data,ModbusIOException) or isinstance(data, ExceptionResponse):
                 if retries < 1:
-                    _LOGGER.debug(f"IO Error: {data}. Retrying...")
+                    _LOGGER.warning(f"IO Error: {data}. Retrying...")
                     return await self.get_registers(address=address, count=count, retries = retries + 1)
                 else:
-                    _LOGGER.error(f"error reading register: {address} count: {count} unit id: {self._unit_id} error: {data} ")
+                    _LOGGER.error(f"error reading register: {address} count: {count} unit id: {self._unit_id} retries {retries} error: {data} ")
             else:
-                _LOGGER.error(f"error reading register: {address} count: {count} unit id: {self._unit_id} error: {data} ")
+                _LOGGER.error(f"unknown error reading register: {address} count: {count} unit id: {self._unit_id} retries {retries} error type: {type(data)} error: {data} ")
             return None
         return data.registers
 
     async def write_registers(self, unit_id, address, payload):
         """Write registers."""
-        _LOGGER.info(f"write registers a: {address} p: {payload}")
-        #with self._lock:
+        #_LOGGER.debug(f"write registers a: {address} p: {payload}")
+        await self._check_and_reconnect()
         return await self._client.write_registers(
             address=address, values=payload, slave=unit_id
         )
@@ -173,7 +180,7 @@ class ExtModbusClient:
             else:
                 result = byteArray[pos+1] * 256 + byteArray[pos]
         except:
-          return 0
+            return 0
         return result
 
     def convert_from_byte_int16(self, byteArray, pos, type='BE'): 
@@ -185,26 +192,25 @@ class ExtModbusClient:
             if (result > 32768):
                 result -= 65536
         except:
-          return 0
+            return 0
         return result
 
-    def bitmask_to_strings(self, bitmask, bitmask_list, bits=16):
+    def bitmask_to_strings(self, bitmask, bitmask_dict:dict, bits=16):
         strings = []
-        len_list = len(bitmask_list)
         for bit in range(bits):
             if bitmask & (1<<bit):
-                if bit < len_list: 
-                    value = bitmask_list[bit]
-                else:
+                value = bitmask_dict.get(bit)
+                if value is None:
                     value = f'bit {bit} undefined'
                 strings.append(value)
         return strings
 
-    def bitmask_to_string(self, bitmask, bitmask_list, default='NA', max_length=255, bits=16):
-        strings = self.bitmask_to_strings(bitmask = bitmask, bitmask_list = bitmask_list, bits = bits)
+    def bitmask_to_string(self, bitmask, bitmask_dict, default='NA', max_length=255, bits=16):
+        strings = self.bitmask_to_strings(bitmask = bitmask, bitmask_dict = bitmask_dict, bits = bits)
         return self.strings_to_string(strings=strings, default=default, max_length=max_length)
     
     def strings_to_string(self, strings, default='NA', max_length=255):
         if len(strings):
             return ','.join(strings)[:max_length]
         return default
+    
