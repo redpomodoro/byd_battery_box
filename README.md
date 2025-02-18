@@ -1,7 +1,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
 
 # byd_battery_box
-Home assistant Custom Component for reading data from BYD Battery Box. This integration uses a local modbus connection. 
+Home assistant Custom Component for reading data from BYD Battery Box system series like HVL, HVM, HVS, LVS. This integration uses a local modbus connection. 
 
 > [!CAUTION]
 > This is a work in progress project - it is still in early development stage, so there are still breaking changes possible.
@@ -19,15 +19,15 @@ Home assistant Custom Component for reading data from BYD Battery Box. This inte
 Copy contents of custom_components folder to your home-assistant config/custom_components folder or install through HACS.
 After reboot of Home-Assistant, this integration can be configured through the integration setup UI.
 
-#Data Updates
-The key BMU Status data will be refreshed 60 seconds. 
+# Data Updates
+The key BMU Status data will by default refreshed 30 seconds. 
 
 Detailed BMS data will be refreshed by default every 10 minutes.
 
-The log data will be refresehd every 10 minutes. Note that on first load it will take several minutes to load log data.  
+# Log data
+The log data is refreshed as the same rate as the BMS data. Log data is stored in /config/custom_components/byd_battery_box/log folder. The integration uses the json file for storage and for convenience a CSV file is being stored as well.
 
-
-
+Use the buttons on the devices to retrieve additional log history, during the update all other data updates will be suspended. The integration writes warnings into log to see progress of the updates.
 
 
 # Usage

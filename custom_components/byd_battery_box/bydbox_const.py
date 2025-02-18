@@ -28,6 +28,14 @@ APPLICATION_LIST = [ "Off Grid", "On Grid", "Backup" ]
 PHASE_LIST = [ "Single", "Three" ]
 WORKING_AREA = [ "B", "A", "B" ]
 
+MODULE_SPECS = {
+    'LVL': {'capacity': 8.68, 'cells': 0, 'sensors_t': 0},
+    'LVS': {'capacity': 4, 'cells': 16, 'sensors_t': 8},
+    'HVL': {'capacity': 4, 'cells': 0, 'sensors_t': 0},
+    'HVM': {'capacity': 2.76, 'cells': 16, 'sensors_t': 8},
+    'HVS': {'capacity': 2.56, 'cells': 32, 'sensors_t': 12},
+    }
+
 MODULE_TYPE = {
     0: "HVL",
     1: "HVM",

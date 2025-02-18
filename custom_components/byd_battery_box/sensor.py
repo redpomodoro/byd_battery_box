@@ -132,7 +132,7 @@ class BydBoxSensor(SensorEntity):
     def state(self):
         """Return the state of the sensor."""
         if self._key in self._hub.data:
-            return self._hub.data[self._key]
+            return self._hub.data.get(self._key)
 
     @property
     def extra_state_attributes(self):

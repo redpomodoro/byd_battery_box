@@ -19,6 +19,8 @@ from .const import (
     CONF_UNIT_ID,
     DEFAULT_BMS_SCAN_INTERVAL,
     CONF_BMS_SCAN_INTERVAL,
+    DEFAULT_LOG_SCAN_INTERVAL,
+    CONF_LOG_SCAN_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,6 +46,7 @@ DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_UNIT_ID, default=DEFAULT_UNIT_ID): int,
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
         vol.Optional(CONF_BMS_SCAN_INTERVAL, default=DEFAULT_BMS_SCAN_INTERVAL): int,
+        vol.Optional(CONF_LOG_SCAN_INTERVAL, default=DEFAULT_LOG_SCAN_INTERVAL): int,
     }
 )
 
@@ -62,9 +65,11 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
         raise ScanIntervalTooShort
     if data[CONF_BMS_SCAN_INTERVAL] < 60:
         raise BmsScanIntervalTooShort
+    if data[CONF_LOG_SCAN_INTERVAL] < 120:
+        raise LogScanIntervalTooShort
 
     try:
-        hub = Hub(hass, data[CONF_NAME], data[CONF_HOST], data[CONF_PORT], data[CONF_UNIT_ID], data[CONF_SCAN_INTERVAL], data[CONF_BMS_SCAN_INTERVAL])
+        hub = Hub(hass, data[CONF_NAME], data[CONF_HOST], data[CONF_PORT], data[CONF_UNIT_ID], data[CONF_SCAN_INTERVAL], data[CONF_BMS_SCAN_INTERVAL], data[CONF_LOG_SCAN_INTERVAL])
         await hub.init_data(close=True)
     except Exception as e:
         # If there is an error, raise an exception to notify HA that there was a
@@ -113,6 +118,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "scan_interval_too_short"
             except BmsScanIntervalTooShort:
                 errors["base"] = "bms_scan_interval_too_short"
+            except LogScanIntervalTooShort:
+                errors["base"] = "log_scan_interval_too_short"
             except InvalidPort:
                 errors["base"] = "bms_scan_interval_too_short"
             except BmsScanIntervalTooShort:
@@ -145,3 +152,6 @@ class ScanIntervalTooShort(exceptions.HomeAssistantError):
 
 class BmsScanIntervalTooShort(exceptions.HomeAssistantError):
     """Error to indicate the bms scan interval is too short."""
+
+class LogScanIntervalTooShort(exceptions.HomeAssistantError):
+    """Error to indicate the log scan interval is too short."""

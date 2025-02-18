@@ -11,20 +11,23 @@ import asyncio
 
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.utilities import unpack_bitstring
-from pymodbus.exceptions import ModbusIOException
+from pymodbus.exceptions import ModbusIOException, ConnectionException
 from pymodbus import ExceptionResponse
+from  pymodbus.register_write_message import WriteMultipleRegistersResponse
 
 _LOGGER = logging.getLogger(__name__)
 
 class ExtModbusClient:
+
+    busy = False
 
     def __init__(self, host: str, port: int, unit_id: int, timeout: int, framer:str) -> None:
         """Init Class"""
         self._host = host
         self._port = port
         self._unit_id = unit_id
-        self.busy = False
         self._client = AsyncModbusTcpClient(host=host, port=port, framer=framer, timeout=timeout) 
+        _LOGGER.debug(f'client timeout {timeout}')
 
         #_LOGGER.debug(f"pymodbus {version('pymodbus')}")      # Python 3.8
         #_LOGGER.debug(f"pymodbus {pkg_resources.get_distribution("simplegist").version}")
@@ -34,32 +37,25 @@ class ExtModbusClient:
         """Disconnect client."""
         self._client.close()
 
-    async def connect(self):
+    async def connect(self, retries = 3):
         """Connect client."""
-        #_LOGGER.debug("Modbus connect")
-        result = False
-        retries = 0
-        while not result and retries < 4: 
-            if retries > 0:
-                _LOGGER.warning(f"Retry attempt: {retries} connecting to: {self._host}:{self._port} unit id: {self._unit_id}")
+        for attempts in range(retries): 
+            if attempts > 0:
+                _LOGGER.debug(f"Connect retry attempt: {attempts}/{retries} connecting to: {self._host}:{self._port} unit id: {self._unit_id}")
                 await asyncio.sleep(.2)
-            result = await self._client.connect()
-            retries += 1
+            connected = await self._client.connect()
+            if connected:
+                break
+
         if not self._client.connected:
-            raise Exception(f"Failed connection to {self._host}:{self._port} unit id: {self._unit_id} retried {retries-1}")
-        if result:
-            _LOGGER.debug("successfully connected to %s:%s", self._client.comm_params.host, self._client.comm_params.port)
-        else:
-            _LOGGER.debug("not able to connect to %s:%s", self._client.comm_params.host, self._client.comm_params.port)
-        return result
+            raise Exception(f"Failed to connect to {self._host}:{self._port} unit id: {self._unit_id} retries: {retries}")
+        _LOGGER.debug("successfully connected to %s:%s", self._client.comm_params.host, self._client.comm_params.port)
+        return True
 
     async def _check_and_reconnect(self):
-        #_LOGGER.debug(f"Connection status {self._client.connected}")
         if not self._client.connected:
-            #_LOGGER.debug("Modbus client is not connected, trying to reconnect")
-            await self.connect()
-        if not self._client.connected:
-            raise Exception(f'Lost connection')
+            _LOGGER.warning("Modbus client is not connected, reconnecting...", exc_info=True)
+            return await self.connect()
         return self._client.connected
     
     @property
@@ -79,35 +75,73 @@ class ExtModbusClient:
             raise ValueError(f"Value {value} failed validation ({comparison}{against})")
         return value
 
-    async def read_holding_registers(self, unit_id, address, count):
+    async def read_holding_registers(self, unit_id, address, count, retries = 3):
         """Read holding registers."""
         #_LOGGER.debug(f"read registers a: {address} s: {unit_id} c {count} {self._client.connected}")
         await self._check_and_reconnect()
-        return await self._client.read_holding_registers(
-            address=address, count=count, slave=unit_id
-        )
 
-    async def get_registers(self, address, count, retries = 0):
-        data = await self.read_holding_registers( unit_id=self._unit_id, address=address, count=count)
-        if data.isError():
-            if isinstance(data,ModbusIOException) or isinstance(data, ExceptionResponse):
-                if retries < 1:
-                    _LOGGER.warning(f"IO Error: {data}. Retrying...")
-                    return await self.get_registers(address=address, count=count, retries = retries + 1)
-                else:
-                    _LOGGER.error(f"error reading register: {address} count: {count} unit id: {self._unit_id} retries {retries} error: {data} ")
+        for attempt in range(retries+1):
+            try:
+                data = await self._client.read_holding_registers(address=address, count=count, slave=unit_id)
+            except ModbusIOException as e:
+                _LOGGER.error(f'error reading registers. IO error. connected: {self._client.connected} address: {address} count: {count} unit id: {self._unit_id}')
+                return None
+            except ConnectionException as e:
+                _LOGGER.error(f'error reading registers. connection exception connected: {self._client.connected} address: {address} count: {count} unit id: {self._unit_id} {e} ')
+                return None
+            except Exception as e:
+                _LOGGER.error(f'error reading registers. unknown error. connected {self._client.connected} address: {address} count: {count} unit id: {self._unit_id} type {type(e)} error {e} ')
+                return None
+
+            if not data.isError():
+                break
             else:
-                _LOGGER.error(f"unknown error reading register: {address} count: {count} unit id: {self._unit_id} retries {retries} error type: {type(data)} error: {data} ")
+                if isinstance(data,ModbusIOException):
+                    _LOGGER.debug(f"io error reading register retries: {attempt}/{retries} connected {self._client.connected} address: {address} count: {count} unit id: {self._unit_id}  error: {data} ")
+                elif isinstance(data, ExceptionResponse):
+                    _LOGGER.debug(f"Exception response reading register retries: {attempt}/{retries} connected {self._client.connected} address: {address} count: {count} unit id: {self._unit_id}  {data}")
+                else:
+                    _LOGGER.debug(f"Unknown data response error reading register retries: {attempt}/{retries} connected {self._client.connected} address: {address} count: {count} unit id: {self._unit_id}  {data}")
+                await asyncio.sleep(.2) 
+
+        if data.isError():
+            _LOGGER.error(f"error reading registers. retries: {attempt}/{retries} connected {self._client.connected} register: {address} count: {count} unit id: {self._unit_id} retries {retries} error: {data} ")
             return None
-        return data.registers
+
+        return data
+
+    async def get_registers(self, address, count):
+        data = await self.read_holding_registers(unit_id=self._unit_id, address=address, count=count)
+
+        if not data is None and len(data.registers)>0:
+            return data.registers
+
+        # some error happened return None
+        if not data is None and len(data.registers) == 0:
+            _LOGGER.warning(f'registers are empty address: {address} count: {count} unit id: {self._unit_id}')
+
+        return None
 
     async def write_registers(self, unit_id, address, payload):
         """Write registers."""
         #_LOGGER.debug(f"write registers a: {address} p: {payload}")
         await self._check_and_reconnect()
-        return await self._client.write_registers(
-            address=address, values=payload, slave=unit_id
-        )
+
+        try:
+            result = await self._client.write_registers(address=address, values=payload, slave=unit_id)
+        except ModbusIOException as e:
+            raise Exception(f'write_registers: IO error {self._client.connected} {e.fcode} {e}')
+        except ConnectionException as e:
+            raise Exception(f'write_registers: no connection {self._client.connected} {e} ')
+        except Exception as e:
+            raise Exception(f'write_registers: unknown error {self._client.connected} {type(e)} {e} ')
+
+        if result.isError():
+            raise Exception(f'write_registers: data error {self._client.connected} {type(result)} {result} ')
+    
+        #_LOGGER.debug(f'write result {type(result)} {result}')
+        return result
+
 
     def calculate_value(self, value, sf, digits=2):
         return round(value * 10**sf, digits)

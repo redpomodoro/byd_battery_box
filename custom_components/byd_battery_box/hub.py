@@ -22,17 +22,20 @@ _LOGGER = logging.getLogger(__name__)
 class Hub:
     """Hub for BYD Battery Box Interface"""
 
-    def __init__(self, hass: HomeAssistant, name: str, host: str, port: int, unit_id: int, scan_interval: int, scan_interval_bms: int = 600) -> None:
+    def __init__(self, hass: HomeAssistant, name: str, host: str, port: int, unit_id: int, scan_interval: int, scan_interval_bms: int = 600, scan_interval_log: int = 600) -> None:
         """Init hub."""
         self._hass = hass
         self._name = name
         self._id = f'{name.lower()}_{host.lower().replace('.','')}'
         self._last_full_update = datetime(2000,1,1)
         self._last_log_update = datetime(2000,1,1)
+        self._last_update = datetime(2000,1,1)
         self._unsub_interval_method = None
         self._entities = []
+        self._min_update_interval = timedelta(seconds=1)
         self._scan_interval = timedelta(seconds=scan_interval)
         self._scan_interval_bms = timedelta(seconds=scan_interval_bms)
+        self._scan_interval_log = timedelta(seconds=scan_interval_log)
         self._bydclient = BydBoxClient(host=host, port=port, unit_id=unit_id, timeout=max(3, (scan_interval - 1)))
         self.online = True     
         self._busy = False
@@ -92,11 +95,18 @@ class Hub:
     def toggle_busy(func):
         async def wrapper(self, *args, **kwargs):
             if self._busy:
-                _LOGGER.debug(f"hub already busy {func.__name__}") 
+                #_LOGGER.debug(f"skip {func.__name__} hub busy") 
                 return
             self._busy = True
-            result = await func(self, *args, **kwargs)
+            error = None
+            try:
+                result = await func(self, *args, **kwargs)
+            except Exception as e:
+                _LOGGER.warning(f'Exception in wrapper {e}')
+                error = e
             self._busy = False
+            if not error is None:
+                raise error
             return result
         return wrapper
 
@@ -112,6 +122,11 @@ class Hub:
         if not self._bydclient.initialized:
             return
 
+        if ((datetime.now()-self._last_update) < self._min_update_interval):
+            #_LOGGER.debug(f"Skip update give system a break ;-)")
+            return
+
+        # update log history
         unit_id = self._update_log_history_depth[0]
         log_depth = self._update_log_history_depth[1]
         if self._update_log_history_depth[1] > 0:
@@ -119,44 +134,61 @@ class Hub:
             _LOGGER.warning(f"Started loading {DEVICE_TYPES[unit_id]} log history; all other data updates will be suspended!")
             try:
                 await self._bydclient.update_log_data(unit_id, log_depth=log_depth)
+                self._last_log_update = datetime.now()
+                self._last_update = datetime.now()
             except Exception as e:
                 _LOGGER.error(f'Failed updating {DEVICE_TYPES[unit_id]} log history {self._update_log_history_depth} {e}', exc_info=True)
+                return False
             self._update_log_history_depth[1] = 0
             if prev_len_log != len(self._bydclient.log):
                 result : bool = await self._hass.async_add_executor_job(self._bydclient.save_log_entries)
-            self._last_log_update = datetime.now()
-
             return True
 
-        try:
-            _LOGGER.debug(f"updating BMU status")
-            result = await self._bydclient.update_bmu_status_data()
-        except Exception as e:
-            _LOGGER.error(f"Error reading status data {e}", exc_info=True)
-            return False
-        
-        if result == False:
-            _LOGGER.warning(f"bms status data not updated")
-            return 
-        self.update_entities()
+        # update last log data
+        if ((datetime.now()-self._last_log_update) > self._scan_interval_log):
+            #_LOGGER.debug(f"start update log data")
+            prev_len_log = len(self._bydclient.log)
+            result = await self._bydclient.update_all_log_data()
+            self._last_log_update = datetime.now()
+            self._last_update = datetime.now()
+            if result:
+                self.update_entities()
+                if prev_len_log != len(self._bydclient.log):
+                    result : bool = await self._hass.async_add_executor_job(self._bydclient.save_log_entries)
+                _LOGGER.debug(f"updated log data")
+            else:
+                _LOGGER.error(f"update log data failed")
+                await asyncio.sleep(5)
 
+        # update bms data
         if ((datetime.now()-self._last_full_update) > self._scan_interval_bms):
-            _LOGGER.debug(f"updating BMS status")
+            #_LOGGER.debug(f"start update BMS status")
             result = await self._bydclient.update_all_bms_status_data()
             if result:
                 self._last_full_update = datetime.now()
+                self._last_update = datetime.now()
                 self.update_entities()
+                _LOGGER.debug(f"updated BMS status")
+            else:
+                _LOGGER.error(f"update BMS status data failed")
+                await asyncio.sleep(5)
 
-        if ((datetime.now()-self._last_log_update) > self._scan_interval_bms):
-#            if ((datetime.now()-self._last_log_update).total_seconds() > 60):
-                _LOGGER.debug(f"updating log")
-                prev_len_log = len(self._bydclient.log)
-                result = await self._bydclient.update_all_log_data()
-                self._last_log_update = datetime.now()
-                if result:
-                    self.update_entities()
-                    if prev_len_log != len(self._bydclient.log):
-                        result : bool = await self._hass.async_add_executor_job(self._bydclient.save_log_entries)
+        # update bmu
+        try:
+            #_LOGGER.debug(f"start update BMU status")
+            result = await self._bydclient.update_bmu_status_data()
+        except Exception as e:
+            _LOGGER.error(f"Error reading BMU status data connection {self._bydclient.connected} error: {e} ", exc_info=True)
+            return False
+        if result:
+            self._last_update = datetime.now()
+            self.update_entities()
+            _LOGGER.debug(f"updated BMU status")
+        else:
+            _LOGGER.warning(f"update BMU status data failed {self._bydclient.connected}")
+            return False
+
+        return True
 
     def update_entities(self):
         for update_callback in self._entities:
@@ -166,12 +198,6 @@ class Hub:
         """Disconnect client."""
         self._bydclient.close()
         _LOGGER.debug(f"close hub")
-
-    # async def connect(self):
-    #     """Connect client."""
-    #     result = await self._bydclient.connect()
-    #     _LOGGER.debug(f"connect {result}")
-    #     return
     
     async def test_connection(self) -> bool:
         """Test connectivity"""

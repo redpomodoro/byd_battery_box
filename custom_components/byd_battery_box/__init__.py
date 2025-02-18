@@ -12,6 +12,8 @@ from homeassistant.const import CONF_NAME, CONF_HOST, CONF_PORT, CONF_SCAN_INTER
 from .const import (
     DOMAIN,
     CONF_UNIT_ID,
+    CONF_BMS_SCAN_INTERVAL,
+    CONF_LOG_SCAN_INTERVAL
 )
 
 from . import hub
@@ -33,12 +35,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: HubConfigEntry) -> bool:
     port = entry.data[CONF_PORT]
     unit_id = entry.data.get(CONF_UNIT_ID, 1)
     scan_interval = entry.data[CONF_SCAN_INTERVAL]
+    scan_interval_bms = entry.data[CONF_BMS_SCAN_INTERVAL]
+    scan_interval_log = entry.data[CONF_LOG_SCAN_INTERVAL]
 
     _LOGGER.debug("Setup %s.%s", DOMAIN, name)
 
     # Store an instance of the "connecting" class that does the work of speaking
     # with your actual devices.
-    entry.runtime_data = hub.Hub(hass = hass, name = name, host = host, port = port, unit_id=unit_id, scan_interval = scan_interval)
+    entry.runtime_data = hub.Hub(hass = hass, name = name, host = host, port = port, unit_id=unit_id, scan_interval = scan_interval, scan_interval_bms = scan_interval_bms, scan_interval_log=scan_interval_log)
     
     await entry.runtime_data.init_data()
 
