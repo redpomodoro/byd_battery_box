@@ -13,7 +13,8 @@ from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.utilities import unpack_bitstring
 from pymodbus.exceptions import ModbusIOException, ConnectionException
 from pymodbus import ExceptionResponse
-from  pymodbus.register_write_message import WriteMultipleRegistersResponse
+#from  pymodbus.register_write_message import WriteMultipleRegistersResponse
+from importlib.metadata import version
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,10 +29,6 @@ class ExtModbusClient:
         self._unit_id = unit_id
         self._client = AsyncModbusTcpClient(host=host, port=port, framer=framer, timeout=timeout) 
         _LOGGER.debug(f'client timeout {timeout}')
-
-        #_LOGGER.debug(f"pymodbus {version('pymodbus')}")      # Python 3.8
-        #_LOGGER.debug(f"pymodbus {pkg_resources.get_distribution("simplegist").version}")
-        #_LOGGER.debug(f'python: {platform.python_version()}')
 
     def close(self):
         """Disconnect client."""

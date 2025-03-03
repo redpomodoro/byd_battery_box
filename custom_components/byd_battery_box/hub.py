@@ -10,6 +10,7 @@ from .bydboxclient import BydBoxClient
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.core import HomeAssistant
+from importlib.metadata import version
 
 from .const import (
     DOMAIN,
@@ -21,6 +22,8 @@ _LOGGER = logging.getLogger(__name__)
 
 class Hub:
     """Hub for BYD Battery Box Interface"""
+
+    PYMODBUS_VERSION = '3.8.3'
 
     def __init__(self, hass: HomeAssistant, name: str, host: str, port: int, unit_id: int, scan_interval: int, scan_interval_bms: int = 600, scan_interval_log: int = 600) -> None:
         """Init hub."""
@@ -40,6 +43,7 @@ class Hub:
         self.online = True     
         self._busy = False
         self._update_log_history_depth = [0,0]
+
 
     @property
     def data(self):
@@ -112,9 +116,19 @@ class Hub:
 
     @toggle_busy
     async def init_data(self, close = False):
+        await self._hass.async_add_executor_job(self.check_pymodbus_version)  
         await self._hass.async_add_executor_job(self._bydclient.update_log_from_file)  
         await self._bydclient.init_data(close = close)
         self.update_entities()
+
+    def check_pymodbus_version(self):
+        if version('pymodbus') is None:
+            _LOGGER.warning(f"pymodbus not found")
+        elif version('pymodbus') < self.PYMODBUS_VERSION:
+            raise Exception(f"pymodbus {version('pymodbus')} found, please update to {self.PYMODBUS_VERSION} or higher")
+        elif version('pymodbus') > self.PYMODBUS_VERSION:
+            _LOGGER.warning(f"newer pymodbus {version('pymodbus')} found")
+        #_LOGGER.debug(f"pymodbus {version('pymodbus')}")      
 
     @toggle_busy
     async def async_update_data(self, _now: Optional[int] = None) -> dict:

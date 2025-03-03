@@ -92,6 +92,7 @@ class BydBoxClient(ExtModbusClient):
 
     @toggle_busy
     async def init_data(self, close = False) -> bool:
+
         if not self._client.connected: await self._client.connect() 
 
         try:
