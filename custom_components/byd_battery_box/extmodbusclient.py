@@ -5,12 +5,17 @@
 import logging
 import operator
 import threading
-from typing import Optional, Literal
+from typing import Literal
 import struct
 import asyncio
 
 from pymodbus.client import AsyncModbusTcpClient
-from pymodbus.utilities import unpack_bitstring
+try:
+    # For newer pymodbus versions (3.9.x+)
+    from pymodbus.pdu.pdu import unpack_bitstring
+except ImportError:
+    # For older pymodbus versions (3.8.x and below)
+    from pymodbus.utilities import unpack_bitstring
 from pymodbus.exceptions import ModbusIOException, ConnectionException
 from pymodbus import ExceptionResponse
 #from  pymodbus.register_write_message import WriteMultipleRegistersResponse
