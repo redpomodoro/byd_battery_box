@@ -84,7 +84,7 @@ class ExtModbusClient:
 
         for attempt in range(retries+1):
             try:
-                data = await self._client.read_holding_registers(address=address, count=count, slave=unit_id)
+                data = await self._client.read_holding_registers(address=address, count=count, device_id=unit_id)
             except ModbusIOException as e:
                 _LOGGER.error(f'error reading registers. IO error. connected: {self._client.connected} address: {address} count: {count} unit id: {self._unit_id}')
                 return None
@@ -106,7 +106,7 @@ class ExtModbusClient:
                     _LOGGER.debug(f"Unknown data response error reading register retries: {attempt}/{retries} connected {self._client.connected} address: {address} count: {count} unit id: {self._unit_id}  {data}")
                 await asyncio.sleep(.2) 
 
-        if data.isError():
+        if data is None or data.isError():
             _LOGGER.error(f"error reading registers. retries: {attempt}/{retries} connected {self._client.connected} register: {address} count: {count} unit id: {self._unit_id} retries {retries} error: {data} ")
             return None
 
@@ -130,7 +130,7 @@ class ExtModbusClient:
         await self._check_and_reconnect()
 
         try:
-            result = await self._client.write_registers(address=address, values=payload, slave=unit_id)
+            result = await self._client.write_registers(address=address, values=payload, device_id=unit_id)
         except ModbusIOException as e:
             raise Exception(f'write_registers: IO error {self._client.connected} {e.fcode} {e}')
         except ConnectionException as e:
