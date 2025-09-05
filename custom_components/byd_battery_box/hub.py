@@ -11,6 +11,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.core import HomeAssistant
 from importlib.metadata import version
+from packaging import version as pkg_version
 
 from .const import (
     DOMAIN,
@@ -122,13 +123,23 @@ class Hub:
         self.update_entities()
 
     def check_pymodbus_version(self):
-        if version('pymodbus') is None:
-            _LOGGER.warning(f"pymodbus not found")
-        elif version('pymodbus') < self.PYMODBUS_VERSION:
-            raise Exception(f"pymodbus {version('pymodbus')} found, please update to {self.PYMODBUS_VERSION} or higher")
-        elif version('pymodbus') > self.PYMODBUS_VERSION:
-            _LOGGER.warning(f"newer pymodbus {version('pymodbus')} found")
-        #_LOGGER.debug(f"pymodbus {version('pymodbus')}")      
+        try:
+            current_version = version('pymodbus')
+            if current_version is None:
+                _LOGGER.warning(f"pymodbus not found")
+                return
+
+            current = pkg_version.parse(current_version)
+            required = pkg_version.parse(self.PYMODBUS_VERSION)
+
+            if current < required:
+                raise Exception(f"pymodbus {current_version} found, please update to {self.PYMODBUS_VERSION} or higher")
+            elif current > required:
+                _LOGGER.warning(f"newer pymodbus {current_version} found")
+            _LOGGER.debug(f"pymodbus {current_version}")
+        except Exception as e:
+            _LOGGER.error(f"Error checking pymodbus version: {e}")
+            raise  
 
     @toggle_busy
     async def async_update_data(self, _now: Optional[int] = None) -> dict:
