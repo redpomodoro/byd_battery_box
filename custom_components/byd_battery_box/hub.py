@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 class Hub:
     """Hub for BYD Battery Box Interface"""
 
-    PYMODBUS_VERSION = '3.8.3'
+    PYMODBUS_VERSION = '3.11.1'
 
     def __init__(self, hass: HomeAssistant, name: str, host: str, port: int, unit_id: int, scan_interval: int, scan_interval_bms: int = 600, scan_interval_log: int = 600) -> None:
         """Init hub."""
@@ -128,7 +128,7 @@ class Hub:
             raise Exception(f"pymodbus {version('pymodbus')} found, please update to {self.PYMODBUS_VERSION} or higher")
         elif version('pymodbus') > self.PYMODBUS_VERSION:
             _LOGGER.warning(f"newer pymodbus {version('pymodbus')} found")
-        #_LOGGER.debug(f"pymodbus {version('pymodbus')}")      
+        _LOGGER.debug(f"pymodbus {version('pymodbus')}")      
 
     @toggle_busy
     async def async_update_data(self, _now: Optional[int] = None) -> dict:
