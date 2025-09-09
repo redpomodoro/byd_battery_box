@@ -239,8 +239,7 @@ class BydBoxClient(ExtModbusClient):
         elif model == "HVL":                                 
           inverter = HVL_INVERTER_LIST.get(id)
         else:  # HVM, HVS
-          if id >= 0 and id <= 16:
-            inverter = INVERTER_LIST[id]
+            inverter = INVERTER_LIST.get(id)
         if inverter is None:
             inverter = f'Unknown: {id} {model}'
             _LOGGER.error(f"unknown inverter. model: {model} inverter id: {id}")
