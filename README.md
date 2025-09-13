@@ -16,8 +16,20 @@ Home assistant Custom Component for reading data from BYD Battery Box system ser
 > Note using other applications connecting to battery simulatousnely might give unexpected results. 
 
 # Installation
-Copy contents of custom_components folder to your home-assistant config/custom_components folder or install through HACS.
-After reboot of Home-Assistant, this integration can be configured through the integration setup UI.
+
+## HACS (recommended) 
+
+This card is available in [HACS](https://hacs.xyz/) (Home Assistant Community Store).
+
+<small>*HACS is a third party community store and is not included in Home Assistant out of the box.*</small>
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=TimWeyand&repository=byd_battery_box)
+
+## Manual install
+
+1. Download and copy Installation to your home-assistant config/custom_components folder.
+
+2. After reboot of Home-Assistant, this integration can be configured through the integration setup UI.
 
 # Data Updates
 The key BMU Status data will by default refreshed 30 seconds. 
