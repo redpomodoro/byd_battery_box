@@ -23,7 +23,7 @@ This card is available in [HACS](https://hacs.xyz/) (Home Assistant Community St
 
 <small>*HACS is a third party community store and is not included in Home Assistant out of the box.*</small>
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=TimWeyand&repository=byd_battery_box&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=redpomodoro&repository=byd_battery_box&category=integration)
 
 ## Manual install
 
