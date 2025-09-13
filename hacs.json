@@ -1,4 +1,6 @@
 {
-    "name": "BYD Battery Box",
-    "homeassistant": "2024.4.0"
-  }
+  "name": "BYD Battery Box",
+  "homeassistant": "2024.4.0",
+  "content_in_root": false,
+  "render_readme": true
+}
